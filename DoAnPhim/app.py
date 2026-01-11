@@ -5,119 +5,148 @@ from sklearn.metrics.pairwise import cosine_similarity
 import os
 
 # --- Cấu hình Trang ---
-st.set_page_config(page_title="MovieFlix - Collaborative Filtering", layout="wide")
+st.set_page_config(page_title="MovieFlix Premium", layout="wide", page_icon="🍿")
 
-# Tùy chỉnh CSS để giao diện chuyên nghiệp hơn
+# --- CUSTOM CSS: Giao diện Cinema hiện đại ---
 st.markdown("""
     <style>
-    .main { background-color: #141414 !important; color: white !important; }
-    .stApp { background-color: #141414; }
-    .movie-card {
-        background-color: #2f2f2f;
+    /* Nền tối chủ đạo */
+    .stApp { background-color: #0e1117; }
+    
+    /* Sidebar nổi bật */
+    [data-testid="stSidebar"] {
+        background-image: linear-gradient(#2e3440, #0e1117);
+        border-right: 1px solid #e50914;
+    }
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2 {
+        color: #e50914 !important;
+        font-family: 'Helvetica Neue', sans-serif;
+    }
+
+    /* Thẻ phim (Movie Card) */
+    .movie-container {
+        background-color: #1a1c23;
         padding: 15px;
-        border-radius: 10px;
+        border-radius: 15px;
+        border: 1px solid #30363d;
         text-align: center;
-        margin-bottom: 20px;
-        height: 380px;
-        border: 1px solid #404040;
+        transition: transform .3s;
+        height: 400px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     }
-    h1, h2, h3, p { color: white !important; }
-    .stButton>button { 
-        width: 100%; border-radius: 5px; 
-        background-color: #e50914; color: white; 
-        border: none; font-weight: bold;
+    .movie-container:hover {
+        transform: scale(1.05);
+        border-color: #e50914;
+        box-shadow: 0 10px 20px rgba(229, 9, 20, 0.2);
     }
-    .stButton>button:hover { background-color: #ff0a16; color: white; }
+    .movie-title {
+        color: #ffffff;
+        font-size: 1.1rem;
+        font-weight: bold;
+        margin: 10px 0;
+        height: 50px;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+    .movie-genre {
+        color: #b3b3b3;
+        font-size: 0.85rem;
+    }
+
+    /* Nút bấm đỏ đặc trưng */
+    .stButton>button {
+        background-color: #e50914;
+        color: white;
+        border-radius: 20px;
+        border: none;
+        padding: 10px 20px;
+        font-weight: bold;
+        width: 100%;
+        transition: 0.3s;
+    }
+    .stButton>button:hover {
+        background-color: #ff0a16;
+        box-shadow: 0 0 15px #e50914;
+        color: white;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 1. Hàm Load Dữ liệu (Sửa lỗi đường dẫn tại đây) ---
+# --- Logic tải dữ liệu ---
 @st.cache_data
 def load_movie_data():
-    # Lấy đường dẫn tuyệt đối của thư mục chứa file app.py
     base_path = os.path.dirname(__file__)
-    
-    # Xác định đường dẫn file chính xác dù chạy ở bất cứ đâu
     movies_path = os.path.join(base_path, 'movies.csv')
     ratings_path = os.path.join(base_path, 'ratings.csv')
-    
-    # Kiểm tra xem file có tồn tại hay không trước khi đọc
     if not os.path.exists(movies_path) or not os.path.exists(ratings_path):
         return None, None
+    return pd.read_csv(movies_path), pd.read_csv(ratings_path)
 
-    movies = pd.read_csv(movies_path)
-    ratings = pd.read_csv(ratings_path)
-    return movies, ratings
-
-# Thực thi tải dữ liệu
 movies, ratings = load_movie_data()
 
-if movies is not None and ratings is not None:
-    # --- 2. Tiền xử lý ma trận User-Item ---
-    # Giới hạn dữ liệu nếu cần để tăng tốc độ xử lý (ví dụ: lấy 200 users đầu tiên)
+if movies is not None:
+    # Xử lý ma trận (Collaborative Filtering)
     user_item_matrix = ratings.pivot(index='userId', columns='movieId', values='rating').fillna(0)
-    
-    # Tính toán độ tương đồng Cosine
     user_similarity = cosine_similarity(user_item_matrix)
     user_similarity_df = pd.DataFrame(user_similarity, index=user_item_matrix.index, columns=user_item_matrix.index)
 
-    # --- 3. Logic Khuyến nghị ---
-    def get_recommendations(user_id, num=6):
-        if user_id not in user_similarity_df.index:
-            return pd.DataFrame()
-            
-        # Lấy top 10 người dùng tương đồng nhất
-        similar_users = user_similarity_df[user_id].sort_values(ascending=False).iloc[1:11].index
-        
-        # Tính điểm trung bình cộng tác
-        similar_ratings = user_item_matrix.loc[similar_users].mean(axis=0)
-        
-        # Lọc bỏ phim đã xem
-        user_watched = user_item_matrix.loc[user_id]
-        recommendations = similar_ratings[user_watched == 0].sort_values(ascending=False).head(num)
-        
-        return movies[movies['movieId'].isin(recommendations.index)]
+    # --- SIDEBAR: Phần đăng nhập ---
+    with st.sidebar:
+        st.markdown("# 👤 THÀNH VIÊN")
+        st.info("Nhập mã ID để nhận gợi ý cá nhân hóa")
+        user_id = st.number_input("User ID (1 - 610):", min_value=1, max_value=610, value=1)
+        num_rec = st.slider("Số lượng gợi ý:", 4, 12, 8)
+        st.divider()
+        st.write("Hệ thống: **Collaborative Filtering**")
+        st.write("Dữ liệu: **MovieLens 100k**")
 
-    # --- 4. Giao diện Người dùng ---
-    st.title("🍿 MovieFlix")
+    # --- MAIN CONTENT ---
+    st.markdown("<h1 style='text-align: center; color: #e50914;'>🍿 MOVIEFLIX PREMIUM</h1>", unsafe_allow_html=True)
     
-    st.sidebar.header("🚪 Đăng nhập hệ thống")
-    user_id = st.sidebar.number_input("Nhập User ID (1 - 610):", min_value=1, max_value=610, value=1)
-    num_rec = st.sidebar.slider("Số lượng phim gợi ý:", 3, 12, 6)
+    # Gợi ý phim
+    st.markdown(f"### 🌟 Danh sách đề xuất cho User #{user_id}")
     
-    st.markdown(f"### 🎬 Danh sách dành riêng cho User #{user_id}")
-    
-    rec_movies = get_recommendations(user_id, num_rec)
-    
-    if not rec_movies.empty:
-        # Hiển thị dạng Grid
-        cols = st.columns(3)
-        for idx, (i, row) in enumerate(rec_movies.iterrows()):
-            with cols[idx % 3]:
-                st.markdown(f"""
-                    <div class="movie-card">
-                        <img src="https://via.placeholder.com/180x240?text=🎬" style="width:100%; border-radius:5px; margin-bottom:10px;">
-                        <h4 style="height: 50px; overflow: hidden;">{row['title']}</h4>
-                        <p style="color: #b3b3b3; font-size: 0.8em;">{row['genres']}</p>
+    # Logic lấy phim
+    similar_users = user_similarity_df[user_id].sort_values(ascending=False).iloc[1:11].index
+    similar_ratings = user_item_matrix.loc[similar_users].mean(axis=0)
+    user_watched = user_item_matrix.loc[user_id]
+    rec_ids = similar_ratings[user_watched == 0].sort_values(ascending=False).head(num_rec).index
+    rec_movies = movies[movies['movieId'].isin(rec_ids)]
+
+    # Hiển thị Grid
+    cols = st.columns(4) # Chia 4 cột cho đẹp
+    for idx, (_, row) in enumerate(rec_movies.iterrows()):
+        with cols[idx % 4]:
+            st.markdown(f"""
+                <div class="movie-container">
+                    <img src="https://via.placeholder.com/200x280/1a1c23/ffffff?text=FILM" style="width:100%; border-radius:10px;">
+                    <div>
+                        <div class="movie-title">{row['title']}</div>
+                        <div class="movie-genre">{row['genres'].split('|')[0]}</div>
                     </div>
-                    """, unsafe_allow_html=True)
-                if st.button(f"Phát Phim", key=f"rec_{row['movieId']}"):
-                    st.balloons()
-                    st.success(f"Đang chuẩn bị phát: {row['title']}")
-    else:
-        st.warning("Không tìm thấy dữ liệu gợi ý cho người dùng này.")
+                </div>
+            """, unsafe_allow_html=True)
+            if st.button("▶ Xem ngay", key=f"btn_{row['movieId']}"):
+                st.toast(f"Đang tải: {row['title']}")
 
-    # --- Phim thịnh hành ---
-    st.divider()
-    st.subheader("🔥 Xu hướng hiện nay")
-    trending = movies.sample(6)
-    t_cols = st.columns(6)
-    for idx, (i, row) in enumerate(trending.iterrows()):
+    # Phim Xu hướng
+    st.markdown("---")
+    st.markdown("### 🔥 Xu hướng hiện nay")
+    trending = movies.sample(4)
+    t_cols = st.columns(4)
+    for idx, (_, row) in enumerate(trending.iterrows()):
         with t_cols[idx]:
-            st.image("https://via.placeholder.com/150x220?text=Poster", caption=row['title'][:15])
+            st.markdown(f"""
+                <div class="movie-container">
+                    <img src="https://via.placeholder.com/200x280/e50914/ffffff?text=TRENDING" style="width:100%; border-radius:10px;">
+                    <div class="movie-title">{row['title']}</div>
+                </div>
+            """, unsafe_allow_html=True)
 
 else:
-    # Thông báo lỗi nếu thiếu file
-    st.error("❌ Lỗi hệ thống: Không tìm thấy dữ liệu đầu vào!")
-    st.info("Vui lòng kiểm tra chắc chắn rằng file **movies.csv** và **ratings.csv** đã được upload lên GitHub trong cùng thư mục với app.py.")
-    st.markdown("[Tải dữ liệu tại đây](https://grouplens.org/datasets/movielens/latest/) (Chọn bản ml-latest-small.zip)")
+    st.error("Thiếu file dữ liệu!")
