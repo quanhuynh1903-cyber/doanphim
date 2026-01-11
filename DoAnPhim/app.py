@@ -5,16 +5,16 @@ import os
 # --- 1. Cấu hình Trang ---
 st.set_page_config(page_title="MovieSuggest Pro", layout="wide", page_icon="🎬")
 
-# --- 2. CUSTOM CSS: Làm nổi bật Sidebar và chữ ---
+# --- 2. CUSTOM CSS: Sidebar nổi bật và ẩn các thành phần thừa ---
 st.markdown("""
     <style>
     /* Nền tối cho trang */
     .stApp { background-color: #0d1117; }
     
-    /* Sidebar nổi bật hoàn toàn */
+    /* Sidebar nổi bật */
     [data-testid="stSidebar"] {
         background-color: #161b22 !important;
-        border-right: 3px solid #58a6ff; /* Viền xanh nổi bật */
+        border-right: 3px solid #58a6ff;
         min-width: 350px !important;
     }
 
@@ -26,47 +26,51 @@ st.markdown("""
         margin-bottom: 20px;
         text-transform: uppercase;
         text-align: center;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
     
     .sidebar-label {
         color: #ffffff !important;
-        font-size: 1.3rem !important;
-        font-weight: 600 !important;
-        margin-top: 25px;
+        font-size: 1.4rem !important; /* Tăng kích cỡ chữ */
+        font-weight: 700 !important;
+        margin-top: 30px;
+        margin-bottom: 10px;
         display: block;
     }
 
-    /* Thẻ phim (Movie Card) */
+    /* Thẻ phim (Movie Card) tối giản */
     .movie-card {
         background-color: #1c2128;
         padding: 15px;
         border-radius: 15px;
         border: 1px solid #30363d;
         text-align: center;
-        height: 380px;
+        height: 330px; /* Thu gọn vì đã bỏ nút */
         transition: 0.4s;
         display: flex;
         flex-direction: column;
-        justify-content: space-between;
+        justify-content: center;
+        margin-bottom: 20px;
     }
     .movie-card:hover {
         border-color: #58a6ff;
-        transform: scale(1.02);
+        transform: scale(1.05);
         box-shadow: 0 10px 30px rgba(88, 166, 255, 0.2);
     }
     .movie-title {
         color: #f0f6fc;
-        font-size: 1.1rem;
+        font-size: 1.15rem;
         font-weight: bold;
-        height: 55px;
+        margin-top: 15px;
+        height: 60px;
         overflow: hidden;
         display: -webkit-box;
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
     }
-
-    /* Tùy chỉnh Selectbox để dễ nhìn hơn */
-    .stSelectbox label { display: none; } /* Ẩn label mặc định để dùng label tùy chỉnh */
+    
+    /* Ẩn label mặc định của Streamlit để dùng custom label */
+    .stSelectbox label, .stSlider label { display: none; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -82,13 +86,13 @@ def load_data():
 movies = load_data()
 
 if movies is not None:
-    # --- 4. SIDEBAR: Tùy chỉnh theo yêu cầu ---
+    # --- 4. SIDEBAR ---
     with st.sidebar:
         st.markdown("<p class='sidebar-title'>🎬 MOVIE MENU</p>", unsafe_allow_html=True)
         st.divider()
         
-        # Tiêu đề mới theo yêu cầu
-        st.markdown("<span class='sidebar-label'>🔍 Tên phim bạn muốn xem</span>", unsafe_allow_html=True)
+        # Tiêu đề mới theo yêu cầu: "Dạng phim bạn muốn xem"
+        st.markdown("<span class='sidebar-label'>🔍 Dạng phim bạn muốn xem</span>", unsafe_allow_html=True)
         
         genre_map = {
             "Hành động": "Action",
@@ -106,38 +110,33 @@ if movies is not None:
         selected_genre = genre_map[selected_vn]
         
         st.markdown("<span class='sidebar-label'>🔢 Số lượng đề xuất</span>", unsafe_allow_html=True)
-        num_movies = st.slider("", 4, 24, 12)
+        num_movies = st.slider("Số lượng", 4, 24, 12)
         
         st.divider()
-        st.info(f"Hệ thống đang lọc các phim thuộc nhóm: {selected_vn}")
+        st.info(f"Đang tìm kiếm phim: {selected_vn}")
 
     # --- 5. NỘI DUNG CHÍNH ---
-    st.markdown(f"<h1 style='text-align: center; color: #58a6ff;'>🍿 KHÁM PHÁ PHIM {selected_vn.upper()}</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #8b949e; font-size: 1.1rem;'>Danh sách phim được đề xuất dựa trên sở thích cá nhân của bạn</p>", unsafe_allow_html=True)
+    st.markdown(f"<h1 style='text-align: center; color: #58a6ff;'>🍿 ĐỀ XUẤT PHIM {selected_vn.upper()}</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #8b949e; font-size: 1.1rem;'>Danh sách phim được chọn lọc riêng cho bạn</p>", unsafe_allow_html=True)
     st.write("")
 
-    # Lọc phim theo thể loại
+    # Lọc phim
     filtered_movies = movies[movies['genres'].str.contains(selected_genre, case=False, na=False)].head(num_movies)
 
     if not filtered_movies.empty:
         cols = st.columns(4)
         for idx, (_, row) in enumerate(filtered_movies.iterrows()):
             with cols[idx % 4]:
+                # Chỉ hiển thị poster và tên phim, không có nút bấm
                 st.markdown(f"""
                     <div class="movie-card">
                         <img src="https://via.placeholder.com/200x280/161b22/58a6ff?text={selected_vn}" style="width:100%; border-radius:10px;">
-                        <div>
-                            <div class="movie-title">{row['title']}</div>
-                            <p style='color: #8b949e; font-size: 0.85rem; margin-top:5px;'>{row['genres'].replace('|', ' • ')}</p>
-                        </div>
+                        <div class="movie-title">{row['title']}</div>
+                        <p style='color: #8b949e; font-size: 0.85rem; margin-top:5px;'>{row['genres'].split('|')[0]}</p>
                     </div>
                 """, unsafe_allow_html=True)
-                # Nút thông tin
-                if st.button("📄 Chi tiết", key=f"info_{row['movieId']}"):
-                    st.success(f"Thông tin phim: {row['title']}")
-                    st.write(f"Đây là một bộ phim tuyệt vời thuộc thể loại **{selected_vn}**. Bạn có thể tìm xem trên các nền tảng trực tuyến.")
     else:
-        st.warning("Không tìm thấy phim thuộc thể loại này.")
+        st.warning("Không tìm thấy dữ liệu cho thể loại này.")
 
 else:
-    st.error("❌ Không tìm thấy file dữ liệu movies.csv trong thư mục!")
+    st.error("❌ Không tìm thấy file movies.csv!")
