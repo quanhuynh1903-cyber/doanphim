@@ -3,68 +3,80 @@ import requests
 import os
 import time
 
-# --- Cấu hình API TMDB ---
-# THAY THẾ 'YOUR_API_KEY_CỦA_BẠN' BẰNG API KEY THẬT CỦA BẠN
+# --- 1. Cấu hình API TMDB ---
+# QUAN TRỌNG: Hãy dán API Key (v3 auth) của bạn vào đây
 TMDB_API_KEY = 'YOUR_API_KEY_CỦA_BẠN' 
 
-# Đường dẫn thư mục chứa poster
+# Thư mục lưu trữ ảnh (Phải khớp với LOCAL_POSTER_DIR trong app.py)
 POSTER_DIR = "local_posters"
+
 if not os.path.exists(POSTER_DIR):
     os.makedirs(POSTER_DIR)
 
-# --- Hàm tìm và tải poster ---
-def download_poster_for_movie(movie_id, movie_title):
+def download_poster(movie_id, movie_title):
+    file_name = f"{POSTER_DIR}/{movie_id}.jpg"
+    
+    # Kiểm tra nếu đã có ảnh rồi thì bỏ qua không tải lại
+    if os.path.exists(file_name):
+        return True
+
     try:
-        search_title = movie_title.split(' (')[0] # Loại bỏ năm trong tiêu đề
+        # Làm sạch tên phim để tìm kiếm chính xác hơn
+        search_title = movie_title.split(' (')[0]
+        url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={search_title}"
         
-        # Gọi API để tìm kiếm phim
-        url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={search_title}&language=en-US"
-        response = requests.get(url).json()
+        response = requests.get(url, timeout=10)
+        data = response.json()
         
-        if response and response['results']:
-            # Lấy kết quả đầu tiên (thường là kết quả tốt nhất)
-            result = response['results'][0]
-            if result['poster_path']:
-                poster_url = f"https://image.tmdb.org/t/p/w500{result['poster_path']}"
-                file_name = f"{POSTER_DIR}/{movie_id}.jpg"
-                
-                # Tải ảnh về
-                img_data = requests.get(poster_url).content
-                with open(file_name, 'wb') as handler:
-                    handler.write(img_data)
-                print(f"✅ Tải thành công poster cho {movie_title} (ID: {movie_id})")
+        if response.status_code == 200 and data.get('results'):
+            # Lấy poster của kết quả tìm kiếm đầu tiên
+            poster_path = data['results'][0].get('poster_path')
+            if poster_path:
+                poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}"
+                img_data = requests.get(poster_url, timeout=10).content
+                with open(file_name, 'wb') as f:
+                    f.write(img_data)
+                print(f"✅ Đã tải: {movie_title}")
                 return True
+        else:
+            print(f"⚠️ Không tìm thấy poster cho: {movie_title}")
     except Exception as e:
-        print(f"❌ Lỗi khi tải poster cho {movie_title} (ID: {movie_id}): {e}")
+        print(f"❌ Lỗi khi xử lý phim {movie_title}: {e}")
+    
     return False
 
-# --- Main script ---
 if __name__ == "__main__":
-    print("Bắt đầu tải poster phim...")
-    
-    # Đảm bảo file movies.csv nằm cùng thư mục
+    print("🚀 Bắt đầu quá trình thu thập poster phim...")
+
+    # Kiểm tra file dữ liệu
     if not os.path.exists('movies.csv'):
-        print("Lỗi: Không tìm thấy file 'movies.csv'. Vui lòng đặt nó cùng thư mục với script này.")
+        print("❌ Lỗi: Không tìm thấy file 'movies.csv'.")
     else:
-        movies = pd.read_csv('movies.csv')
+        movies_df = pd.read_csv('movies.csv')
         
-        # Sắp xếp phim theo độ phổ biến (giả định) và lấy TOP N
-        # Bạn có thể điều chỉnh số lượng phim muốn tải tại đây
-        num_movies_to_download = 100 
+        # Số lượng phim muốn có ảnh
+        target_count = 100 
         
-        # Nếu có file ratings.csv, chúng ta có thể sắp xếp theo rating để tải các phim "hay"
+        # Ưu tiên lấy những phim có đánh giá cao nếu có file ratings
         if os.path.exists('ratings.csv'):
-            ratings = pd.read_csv('ratings.csv')
-            avg_ratings = ratings.groupby('movieId')['rating'].mean().reset_index()
-            movies = pd.merge(movies, avg_ratings, on='movieId', how='left')
-            movies_to_process = movies.sort_values(by='rating', ascending=False).head(num_movies_to_download)
+            ratings_df = pd.read_csv('ratings.csv')
+            avg_ratings = ratings_df.groupby('movieId')['rating'].mean().reset_index()
+            movies_df = pd.merge(movies_df, avg_ratings, on='movieId', how='left')
+            # Sắp xếp giảm dần theo rating và chỉ lấy những phim có lượt đánh giá đủ tốt
+            movies_to_process = movies_df.sort_values(by='rating', ascending=False).head(target_count * 2)
         else:
-            movies_to_process = movies.head(num_movies_to_download) # Lấy 100 phim đầu tiên nếu không có ratings
+            movies_to_process = movies_df.head(target_count * 2)
+
+        success_count = 0
+        for _, row in movies_to_process.iterrows():
+            if success_count >= target_count:
+                break
+                
+            if download_poster(row['movieId'], row['title']):
+                success_count += 1
             
-        downloaded_count = 0
-        for index, row in movies_to_process.iterrows():
-            if download_poster_for_movie(row['movieId'], row['title']):
-                downloaded_count += 1
-            time.sleep(0.1) # Dừng một chút để tránh bị API chặn (rate limiting)
-            
-        print(f"\nHoàn tất! Đã tải về {downloaded_count} poster vào thư mục '{POSTER_DIR}'.")
+            # Tránh bị TMDB chặn do gửi yêu cầu quá nhanh
+            time.sleep(0.2)
+
+        print(f"\n✨ HOÀN TẤT! Đã có {success_count} ảnh trong thư mục '{POSTER_DIR}'.")
+        print("Bây giờ bạn có thể nén thư mục này lại cùng với app.py để mang đi thuyết trình.")
