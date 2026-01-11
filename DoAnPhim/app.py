@@ -4,14 +4,14 @@ import numpy as np
 import os
 import requests
 
-# --- 1. Cấu hình Trang ---
+# --- 1. Cấu hình Trang và API Key ---
 st.set_page_config(page_title="MovieSuggest Pro", layout="wide", page_icon="🎬")
 
-# --- 2. Cấu hình API TMDB ---
-# Lưu ý: Bạn cần thay mã API Key thật của bạn vào đây
+# THAY THẾ 'YOUR_API_KEY_CỦA_BẠN' BẰNG API KEY THẬT TỪ TMDB
 TMDB_API_KEY = 'YOUR_API_KEY_CỦA_BẠN' 
+LOCAL_POSTER_DIR = "local_posters"
 
-# --- 3. CUSTOM CSS: Giao diện chuyên nghiệp ---
+# --- 2. Giao diện CSS: Làm nổi bật Sidebar và Card phim ---
 st.markdown("""
     <style>
     .stApp { background-color: #0d1117; }
@@ -39,7 +39,7 @@ st.markdown("""
         border-radius: 15px;
         border: 1px solid #30363d;
         text-align: center;
-        height: 460px; /* Tăng chiều cao để chứa poster và sao */
+        height: 460px;
         transition: 0.4s;
         display: flex;
         flex-direction: column;
@@ -67,11 +67,12 @@ st.markdown("""
         font-size: 1.2rem;
         margin-top: 8px;
     }
+    /* Ẩn label mặc định của Streamlit */
     .stSelectbox label, .stSlider label { display: none; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 4. Hàm xử lý dữ liệu ---
+# --- 3. Hàm xử lý dữ liệu ---
 @st.cache_data
 def load_data():
     base_path = os.path.dirname(__file__)
@@ -82,28 +83,36 @@ def load_data():
         movies = pd.read_csv(movies_path)
         ratings = pd.read_csv(ratings_path)
         
-        # Tính điểm trung bình thật
+        # Tính điểm trung bình thật từ MovieLens
         avg_ratings = ratings.groupby('movieId')['rating'].mean().reset_index()
         movies = pd.merge(movies, avg_ratings, on='movieId', how='left')
         
-        # Gán rating ngẫu nhiên cho phim thiếu dữ liệu để demo sinh động
+        # Gán rating ngẫu nhiên nhẹ cho phim thiếu dữ liệu để demo sinh động
         movies['rating'] = movies['rating'].apply(lambda x: x if pd.notnull(x) else np.random.uniform(3.0, 4.8))
         return movies
     return None
 
 @st.cache_data
-def get_movie_poster(movie_title):
+def get_movie_poster(movie_id, movie_title):
+    # 1. Thử lấy ảnh cục bộ trước (Dành cho thuyết trình offline)
+    local_path = os.path.join(LOCAL_POSTER_DIR, f"{movie_id}.jpg")
+    if os.path.exists(local_path):
+        return local_path
+
+    # 2. Nếu không có ảnh cục bộ, gọi API TMDB (Cần có mạng)
     try:
-        # Xử lý chuỗi tìm kiếm (loại bỏ năm trong ngoặc)
         search_title = movie_title.split(' (')[0]
         url = f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={search_title}"
-        response = requests.get(url).json()
+        response = requests.get(url, timeout=5).json()
         
-        if response['results'] and response['results'][0]['poster_path']:
+        if response.get('results') and len(response['results']) > 0:
             poster_path = response['results'][0]['poster_path']
-            return f"https://image.tmdb.org/t/p/w500{poster_path}"
-    except:
+            if poster_path:
+                return f"https://image.tmdb.org/t/p/w500{poster_path}"
+    except Exception:
         pass
+    
+    # 3. Ảnh mặc định nếu cả 2 cách trên đều thất bại
     return "https://via.placeholder.com/500x750/161b22/58a6ff?text=No+Poster"
 
 def render_stars(rating):
@@ -112,11 +121,11 @@ def render_stars(rating):
     empty_stars = 5 - full_stars - half_star
     return "⭐" * full_stars + "🌗" * half_star + "☆" * empty_stars
 
-# --- THỰC THI ---
+# --- 4. Thực thi logic chính ---
 movies = load_data()
 
 if movies is not None:
-    # --- 5. SIDEBAR ---
+    # --- 5. SIDEBAR: Bảng điều khiển ---
     with st.sidebar:
         st.markdown("<p class='sidebar-title'>🎬 MOVIE MENU</p>", unsafe_allow_html=True)
         st.divider()
@@ -138,19 +147,21 @@ if movies is not None:
         st.write("✅ RMSE: **0.872**")
         st.write("✅ Thuật toán: **Content-Based**")
 
-    # --- 6. NỘI DUNG CHÍNH ---
+    # --- 6. NỘI DUNG CHÍNH: Hiển thị phim ---
     st.markdown(f"<h1 style='text-align: center; color: #58a6ff;'>🍿 ĐỀ XUẤT PHIM {selected_vn.upper()}</h1>", unsafe_allow_html=True)
     
-    # Lọc và lấy mẫu ngẫu nhiên để đa dạng hóa mức sao
+    # Lọc phim theo thể loại và lấy mẫu ngẫu nhiên
     genre_filter = movies[movies['genres'].str.contains(selected_genre, case=False, na=False)]
+    
+    # Đảm bảo không lấy quá số lượng phim đang có trong kho
     display_movies = genre_filter.sample(min(len(genre_filter), num_movies))
 
     if not display_movies.empty:
         cols = st.columns(4)
         for idx, (_, row) in enumerate(display_movies.iterrows()):
             with cols[idx % 4]:
-                # Lấy poster từ API và render sao
-                poster_url = get_movie_poster(row['title'])
+                # Lấy poster (Ưu tiên local -> API)
+                poster_url = get_movie_poster(row['movieId'], row['title'])
                 star_text = render_stars(row['rating'])
                 
                 st.markdown(f"""
@@ -164,6 +175,6 @@ if movies is not None:
                     </div>
                 """, unsafe_allow_html=True)
     else:
-        st.warning("Không tìm thấy phim phù hợp.")
+        st.warning("Không tìm thấy phim phù hợp trong kho dữ liệu.")
 else:
-    st.error("Thiếu file dữ liệu movies.csv hoặc ratings.csv!")
+    st.error("❌ Lỗi: Thiếu file movies.csv hoặc ratings.csv trong thư mục làm việc!")
