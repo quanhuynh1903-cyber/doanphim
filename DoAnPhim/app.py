@@ -84,4 +84,19 @@ try:
 
 except Exception as e:
     st.error("Lỗi: Đảm bảo bạn đã có file movies.csv và ratings.csv trong thư mục!")
+
     st.info("Tải dữ liệu tại: https://grouplens.org/datasets/movielens/latest/")
+    import os
+
+@st.cache_data
+def load_data():
+    # Lấy đường dẫn của thư mục chứa file app.py hiện tại
+    base_path = os.path.dirname(__file__)
+    
+    # Kết hợp với tên file
+    movies_path = os.path.join(base_path, 'movies.csv')
+    ratings_path = os.path.join(base_path, 'ratings.csv')
+    
+    movies = pd.read_csv(movies_path)
+    ratings = pd.read_csv(ratings_path)
+    return movies, ratings
