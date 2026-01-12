@@ -78,7 +78,7 @@ if movies is not None:
         genre_map = {
             "Hành động": "Action", "Hài hước": "Comedy", "Tình cảm": "Romance",
             "Kinh dị": "Horror", "Khoa học viễn tưởng": "Sci-Fi", "Phiêu lưu": "Adventure",
-            "Hoạt hình": "Animation", "Chính kịch": "Drama", "Tài liệu": "Documentary"
+            "Hoạt hình": "Animation", "Kịch Tính ": "Drama", "Tài liệu": "Documentary"
         }
         selected_vn = st.selectbox("Thể loại", list(genre_map.keys()))
         selected_genre = genre_map[selected_vn]
@@ -159,3 +159,4 @@ if movies is not None:
 
 else:
     st.error("❌ Lỗi: Thiếu file movies.csv hoặc ratings.csv!")
+
