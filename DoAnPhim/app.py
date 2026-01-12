@@ -5,158 +5,152 @@ import os
 import matplotlib.pyplot as plt
 
 # --- 1. Cấu hình Trang ---
-st.set_page_config(page_title="MovieSuggest Pro - Evaluation", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="MovieSuggest Pro - Premium UI", layout="wide", page_icon="🎬")
 
-# Định nghĩa thư mục chứa ảnh cục bộ
-LOCAL_POSTER_DIR = "local_posters"
+# --- 2. Xử lý Giao diện (Theme Mode) ---
+with st.sidebar:
+    st.markdown("### 🎨 Tùy chỉnh giao diện")
+    theme_mode = st.radio("Chọn nền:", ["🌑 Deep Night (Dark)", "🌊 Ocean Blue (Light)"])
+    st.divider()
 
-# --- 2. Giao diện CSS ---
-st.markdown("""
-    <style>
-    .stApp { background-color: #0d1117; }
-    [data-testid="stSidebar"] {
-        background-color: #161b22 !important;
-        border-right: 3px solid #58a6ff;
-        min-width: 350px !important;
-    }
-    .sidebar-title { color: #58a6ff !important; font-size: 1.8rem !important; font-weight: 800 !important; text-align: center; }
-    .sidebar-label { color: #ffffff !important; font-size: 1.3rem !important; font-weight: 700 !important; margin-top: 30px; display: block; }
-    .movie-card {
-        background-color: #1c2128; padding: 15px; border-radius: 15px; border: 1px solid #30363d;
-        text-align: center; height: 460px; transition: 0.4s; display: flex; flex-direction: column;
-        justify-content: space-between; margin-bottom: 25px;
-    }
-    .movie-card:hover { border-color: #58a6ff; transform: scale(1.05); box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
-    .movie-title { color: #f0f6fc; font-size: 1.05rem; font-weight: bold; height: 50px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-    .star-rating { color: #ffb400; font-size: 1.2rem; margin-top: 8px; }
-    .stSelectbox label, .stSlider label { display: none; }
-    
-    /* Style cho bảng so sánh */
-    .compare-table { width: 100%; border-collapse: collapse; color: white; margin-top: 20px; }
-    .compare-table th, .compare-table td { border: 1px solid #30363d; padding: 12px; text-align: center; }
-    .compare-table th { background-color: #161b22; color: #58a6ff; }
-    </style>
-    """, unsafe_allow_html=True)
+# Thiết lập thông số màu sắc dựa trên theme
+if theme_mode == "🌊 Ocean Blue (Light)":
+    main_bg = "background: linear-gradient(-45deg, #a18cd1, #fbc2eb, #a6c1ee, #96e6a1); background-size: 400% 400%; animation: gradient 15s ease infinite;"
+    text_color, card_bg, card_border = "#333", "rgba(255, 255, 255, 0.85)", "1px solid rgba(255, 255, 255, 0.6)"
+    sidebar_bg = "rgba(255, 255, 255, 0.2)"
+else:
+    main_bg = "background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #243b55); background-size: 400% 400%; animation: gradient 15s ease infinite;"
+    text_color, card_bg, card_border = "#f0f0f0", "rgba(30, 30, 30, 0.80)", "1px solid rgba(255, 255, 255, 0.1)"
+    sidebar_bg = "rgba(0, 0, 0, 0.3)"
 
-# --- 3. Hàm xử lý dữ liệu ---
+# Inject CSS mới kết hợp với cấu trúc của bạn
+st.markdown(f"""
+<style>
+@keyframes gradient {{ 0% {{ background-position: 0% 50%; }} 50% {{ background-position: 100% 50%; }} 100% {{ background-position: 0% 50%; }} }}
+.stApp {{ {main_bg} color: {text_color}; font-family: 'Segoe UI', sans-serif; }}
+
+/* Tùy chỉnh Movie Card theo phong cách Glassmorphism */
+.movie-card {{ 
+    background: {card_bg}; 
+    backdrop-filter: blur(12px); 
+    border-radius: 20px; 
+    padding: 15px; 
+    margin-bottom: 25px; 
+    border: {card_border}; 
+    box-shadow: 0 8px 32px 0 rgba(0,0,0,0.15);
+    text-align: center;
+    height: 480px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.3s ease;
+}}
+.movie-card:hover {{ transform: translateY(-10px) scale(1.02); }}
+
+.movie-title {{ color: {text_color}; font-size: 1.1rem; font-weight: bold; height: 50px; overflow: hidden; }}
+.star-rating {{ color: #ffb400; font-size: 1.2rem; margin-top: 8px; }}
+
+/* Tùy chỉnh Sidebar */
+[data-testid="stSidebar"] {{ background-color: {sidebar_bg} !important; backdrop-filter: blur(20px); border-right: 1px solid rgba(255,255,255,0.1); }}
+.sidebar-label {{ color: {text_color} !important; font-weight: bold; font-size: 1.1rem; margin-top: 20px; display: block; }}
+
+/* Bảng so sánh */
+.compare-table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
+.compare-table th, .compare-table td {{ border: 1px solid rgba(255,255,255,0.2); padding: 12px; text-align: center; color: {text_color}; }}
+
+h1, h2, h3 {{ color: {text_color} !important; text-align: center; }}
+.stSelectbox label, .stSlider label {{ display: none; }}
+</style>
+""", unsafe_allow_html=True)
+
+# --- 3. Các hàm hỗ trợ ---
 @st.cache_data
 def load_data():
     base_path = os.path.dirname(__file__)
-    movies_path = os.path.join(base_path, 'movies.csv')
-    ratings_path = os.path.join(base_path, 'ratings.csv')
-    
-    if os.path.exists(movies_path) and os.path.exists(ratings_path):
-        movies = pd.read_csv(movies_path)
-        ratings = pd.read_csv(ratings_path)
-        avg_ratings = ratings.groupby('movieId')['rating'].mean().reset_index()
-        movies = pd.merge(movies, avg_ratings, on='movieId', how='left')
+    m_path, r_path = os.path.join(base_path, 'movies.csv'), os.path.join(base_path, 'ratings.csv')
+    if os.path.exists(m_path) and os.path.exists(r_path):
+        movies = pd.read_csv(m_path)
+        ratings = pd.read_csv(r_path)
+        avg = ratings.groupby('movieId')['rating'].mean().reset_index()
+        movies = pd.merge(movies, avg, on='movieId', how='left')
         movies['rating'] = movies['rating'].apply(lambda x: x if pd.notnull(x) else np.random.uniform(3.0, 4.8))
         return movies
     return None
 
 def get_movie_poster(movie_id):
-    local_path = os.path.join(LOCAL_POSTER_DIR, f"{movie_id}.jpg")
-    if os.path.exists(local_path):
-        return local_path
-    return "https://via.placeholder.com/500x750/161b22/58a6ff?text=No+Poster"
+    local_path = os.path.join("local_posters", f"{movie_id}.jpg")
+    return local_path if os.path.exists(local_path) else "https://via.placeholder.com/500x750?text=No+Poster"
 
 def render_stars(rating):
-    full_stars = int(rating)
-    half_star = 1 if (rating - full_stars) >= 0.5 else 0
-    return "⭐" * full_stars + "🌗" * half_star + "☆" * (5 - full_stars - half_star)
+    f = int(rating)
+    h = 1 if (rating - f) >= 0.5 else 0
+    return "⭐" * f + "🌗" * h + "☆" * (5 - f - h)
 
-# --- 4. Thực thi logic ---
+# --- 4. Logic Ứng dụng ---
 movies = load_data()
 
 if movies is not None:
-    # --- 5. SIDEBAR ---
+    # Sidebar Filters
     with st.sidebar:
-        st.markdown("<p class='sidebar-title'>🎬 MOVIE MENU</p>", unsafe_allow_html=True)
-        st.divider()
+        st.markdown("<h2 style='color:#58a6ff;'>🎬 MENU</h2>", unsafe_allow_html=True)
         st.markdown("<span class='sidebar-label'>🔍 Dạng phim bạn muốn xem</span>", unsafe_allow_html=True)
-        
-        genre_map = {
-            "Hành động": "Action", "Hài hước": "Comedy", "Tình cảm": "Romance",
-            "Kinh dị": "Horror", "Khoa học viễn tưởng": "Sci-Fi", "Phiêu lưu": "Adventure",
-            "Hoạt hình": "Animation", "Kịch Tính ": "Drama", "Tài liệu": "Documentary"
-        }
+        genre_map = {"Hành động": "Action", "Hài hước": "Comedy", "Tình cảm": "Romance", "Kinh dị": "Horror", "Khoa học viễn tưởng": "Sci-Fi", "Phiêu lưu": "Adventure", "Hoạt hình": "Animation", "Chính kịch": "Drama", "Tài liệu": "Documentary"}
         selected_vn = st.selectbox("Thể loại", list(genre_map.keys()))
-        selected_genre = genre_map[selected_vn]
         
         st.markdown("<span class='sidebar-label'>🔢 Số lượng đề xuất</span>", unsafe_allow_html=True)
         num_movies = st.slider("Số lượng", 4, 24, 12)
         
         st.divider()
-        st.markdown("<span class='sidebar-label'>📊 Model Status</span>", unsafe_allow_html=True)
-        st.write("📂 Data: **MovieLens 100k**")
-        st.write("📂 Nguồn ảnh: **Local Storage**")
+        st.write(f"📂 **Data:** MovieLens 100k")
+        st.write(f"📂 **Nguồn ảnh:** Local Storage")
 
-    # --- 6. NỘI DUNG CHÍNH ---
-    st.markdown(f"<h1 style='text-align: center; color: #58a6ff;'>🍿 ĐỀ XUẤT PHIM {selected_vn.upper()}</h1>", unsafe_allow_html=True)
+    # Hiển thị Danh sách Phim
+    st.markdown(f"<h1>🍿 ĐỀ XUẤT PHIM {selected_vn.upper()}</h1>", unsafe_allow_html=True)
     
-    genre_filter = movies[movies['genres'].str.contains(selected_genre, case=False, na=False)]
+    genre_filter = movies[movies['genres'].str.contains(genre_map[selected_vn], case=False, na=False)]
     display_movies = genre_filter.sample(min(len(genre_filter), num_movies))
 
-    if not display_movies.empty:
-        cols = st.columns(4)
-        for idx, (_, row) in enumerate(display_movies.iterrows()):
-            with cols[idx % 4]:
-                poster_url = get_movie_poster(row['movieId'])
-                st.markdown(f"""
-                    <div class="movie-card">
-                        <img src="{poster_url}" style="width:100%; border-radius:10px; height:280px; object-fit:cover;">
-                        <div class="movie-title">{row['title']}</div>
-                        <div>
-                            <div class="star-rating">{render_stars(row['rating'])}</div>
-                            <p style='color: #8b949e; font-size: 0.8rem; margin-top:5px;'>Điểm: {row['rating']:.1f}/5.0</p>
-                        </div>
+    cols = st.columns(4)
+    for idx, (_, row) in enumerate(display_movies.iterrows()):
+        with cols[idx % 4]:
+            poster = get_movie_poster(row['movieId'])
+            st.markdown(f"""
+                <div class="movie-card">
+                    <img src="{poster}" style="width:100%; border-radius:15px; height:280px; object-fit:cover;">
+                    <div class="movie-title">{row['title']}</div>
+                    <div>
+                        <div class="star-rating">{render_stars(row['rating'])}</div>
+                        <p style='opacity: 0.8; font-size: 0.8rem;'>Rating: {row['rating']:.1f}/5.0</p>
                     </div>
-                """, unsafe_allow_html=True)
+                </div>
+            """, unsafe_allow_html=True)
+
+    # --- 5. So sánh & Đánh giá (Giữ nguyên yêu cầu học thuật) ---
+    st.markdown("---")
+    st.markdown("<h2>📊 SO SÁNH & ĐÁNH GIÁ MÔ HÌNH</h2>", unsafe_allow_html=True)
     
-    # --- 7. SO SÁNH VÀ ĐÁNH GIÁ MÔ HÌNH (MỤC MỚI) ---
-    st.divider()
-    st.markdown("<h2 style='text-align: center; color: #58a6ff;'>📊 So Sánh Và Đánh Giá Mô Hình</h2>", unsafe_allow_html=True)
-    
-    # Dữ liệu so sánh thực tế của MovieLens 100k
-    comparison_data = {
+    # Bảng dữ liệu
+    compare_df = pd.DataFrame({
         "Mô hình": ["Content-Based", "User-Based CF", "Matrix Factorization (SVD)"],
-        "RMSE (Càng thấp càng tốt)": [0.942, 0.923, 0.873],
-        "Độ phủ (Coverage)": ["Cao", "Trung bình", "Thấp"],
-        "Ưu điểm": ["Không cần dữ liệu người dùng khác", "Gợi ý phim tương đồng tốt", "Độ chính xác cao nhất"],
-        "Nhược điểm": ["Gợi ý hạn chế (chỉ cùng thể loại)", "Lỗi 'Cold Start'", "Tính toán phức tạp"]
-    }
-    df_compare = pd.DataFrame(comparison_data)
-    
-    # Hiển thị bảng so sánh
-    st.table(df_compare)
+        "RMSE (Sai số)": [0.942, 0.923, 0.873],
+        "Độ phủ": ["Cao", "Trung bình", "Thấp"],
+        "Tốc độ": ["Rất nhanh", "Trung bình", "Chậm"]
+    })
+    st.table(compare_df)
 
-    # Vẽ biểu đồ RMSE bằng Matplotlib
-    st.markdown("### 📉 Biểu đồ sai số RMSE của các mô hình")
+    # Biểu đồ Matplotlib
     fig, ax = plt.subplots(figsize=(10, 4))
-    fig.patch.set_facecolor('#0d1117')
-    ax.set_facecolor('#1c2128')
+    fig.patch.set_alpha(0) # Làm nền biểu đồ trong suốt
+    ax.set_facecolor('rgba(0,0,0,0)')
     
-    colors = ['#58a6ff', '#ffb400', '#e50914']
-    bars = ax.bar(comparison_data["Mô hình"], comparison_data["RMSE (Càng thấp càng tốt)"], color=colors)
+    colors = ['#4b6cb7', '#fbc2eb', '#e50914']
+    bars = ax.bar(compare_df["Mô hình"], compare_df["RMSE (Sai số)"], color=colors, edgecolor='white')
     
-    ax.set_ylabel('RMSE Score', color='white')
-    ax.tick_params(axis='x', colors='white')
-    ax.tick_params(axis='y', colors='white')
-    ax.set_ylim(0, 1.2)
-    
-    # Thêm số trên đầu cột
+    ax.set_ylabel('RMSE Score', color=text_color)
+    ax.tick_params(colors=text_color)
     for bar in bars:
-        yval = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width()/2, yval + 0.02, yval, ha='center', color='white', fontweight='bold')
-
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.02, f'{bar.get_height()}', ha='center', color=text_color, fontweight='bold')
+    
     st.pyplot(fig)
-
-    st.info("""
-    💡 **Đánh giá:** Mô hình **Matrix Factorization (SVD)** cho độ chính xác cao nhất (RMSE thấp nhất), 
-    tuy nhiên mô hình **Content-Based** (đang sử dụng ở giao diện trên) lại có lợi thế lớn về tốc độ xử lý 
-    và không bị ảnh hưởng bởi vấn đề 'Cold Start' (người dùng mới).
-    """)
-
 else:
-    st.error("❌ Lỗi: Thiếu file movies.csv hoặc ratings.csv!")
-
+    st.error("❌ Thiếu file movies.csv hoặc ratings.csv!")
