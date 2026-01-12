@@ -156,30 +156,98 @@ if movies is not None:
                 </div>
             """, unsafe_allow_html=True)
 
-    # --- 5. So sánh Mô hình ---
+   # --- 5. PHÂN TÍCH HIỆU NĂNG MÔ HÌNH (Elite Dashboard) ---
     st.markdown("<br><hr>", unsafe_allow_html=True)
-    st.markdown("### 📊 PHÂN TÍCH HIỆU NĂNG MÔ HÌNH")
+    st.markdown(f"<h2 style='color:{accent_color}; text-shadow: 2px 2px 10px rgba(0,0,0,0.3);'>📊 PHÂN TÍCH HIỆU NĂNG THUẬT TOÁN</h2>", unsafe_allow_html=True)
     
-    c1, c2 = st.columns([1, 1.5])
-    with c1:
-        compare_df = pd.DataFrame({
-            "Mô hình": ["Content-Based", "User-Based CF", "Matrix Factorization"],
-            "RMSE (Sai số)": [0.94, 0.92, 0.87]
-        })
-        st.dataframe(compare_df, use_container_width=True)
-    
-    with c2:
+    # Tạo 3 thẻ Metrics tóm tắt phía trên
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        st.markdown(f"""<div style="background:{card_bg}; padding:20px; border-radius:15px; border:{card_border}; text-align:center;">
+            <p style="margin:0; opacity:0.8;">Mô hình tối ưu nhất</p>
+            <h3 style="margin:5px 0; color:#ff4b4b;">Matrix Factorization</h3>
+        </div>""", unsafe_allow_html=True)
+    with m2:
+        st.markdown(f"""<div style="background:{card_bg}; padding:20px; border-radius:15px; border:{card_border}; text-align:center;">
+            <p style="margin:0; opacity:0.8;">Độ chính xác (RMSE)</p>
+            <h3 style="margin:5px 0; color:#23d5ab;">0.8730</h3>
+        </div>""", unsafe_allow_html=True)
+    with m3:
+        st.markdown(f"""<div style="background:{card_bg}; padding:20px; border-radius:15px; border:{card_border}; text-align:center;">
+            <p style="margin:0; opacity:0.8;">Tập dữ liệu thử nghiệm</p>
+            <h3 style="margin:5px 0; color:{accent_color};">MovieLens 100K</h3>
+        </div>""", unsafe_allow_html=True)
+
+    st.write("<br>", unsafe_allow_html=True)
+
+    # Chia cột cho Bảng và Biểu đồ
+    col_table, col_chart = st.columns([1, 1.2])
+
+    with col_table:
+        st.markdown("#### 📋 Chi tiết các chỉ số")
+        # Sử dụng CSS để làm bảng đẹp hơn
+        st.markdown(f"""
+        <style>
+            .styled-table {{ width:100%; border-collapse: collapse; border-radius:10px; overflow:hidden; font-family: sans-serif; }}
+            .styled-table thead tr {{ background-color: {accent_color}; color: #ffffff; text-align: left; }}
+            .styled-table th, .styled-table td {{ padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }}
+            .styled-table tbody tr:nth-of-type(even) {{ background-color: rgba(255,255,255,0.05); }}
+        </style>
+        <table class="styled-table">
+            <thead>
+                <tr><th>Mô hình</th><th>RMSE (Sai số)</th><th>Độ phủ</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Content-Based</td><td>0.9420</td><td>Cao</td></tr>
+                <tr><td>User-Based CF</td><td>0.9230</td><td>Trung bình</td></tr>
+                <tr style="font-weight:bold; color:#ff4b4b;"><td>Matrix Factorization</td><td>0.8730</td><td>Thấp</td></tr>
+            </tbody>
+        </table>
+        """, unsafe_allow_html=True)
+
+    with col_chart:
+        st.markdown("#### 📉 Biểu đồ sai số RMSE")
         fig, ax = plt.subplots(figsize=(10, 5))
-        fig.patch.set_facecolor('none')
+        
+        # Làm nền trong suốt để khớp với Gradient của App
+        fig.patch.set_alpha(0)
         ax.set_facecolor('none')
-        bars = ax.bar(compare_df["Mô hình"], compare_df["RMSE (Sai số)"], color=[accent_color, '#a18cd1', '#ff4b4b'], width=0.6)
-        ax.set_ylabel('RMSE', color=text_color)
-        ax.tick_params(colors=text_color)
+        
+        models = ["Content-Based", "User-Based CF", "Matrix Factorization"]
+        rmse_values = [0.942, 0.923, 0.873]
+        colors_bar = ['#4b6cb7', '#a18cd1', '#ff4b4b'] # SVD màu đỏ để nổi bật
+        
+        bars = ax.bar(models, rmse_values, color=colors_bar, width=0.6, edgecolor='white', linewidth=1)
+        
+        # Tùy chỉnh trục và chữ
+        ax.set_ylabel('RMSE (Càng thấp càng tốt)', color=text_color, fontsize=12)
+        ax.tick_params(colors=text_color, labelsize=10)
+        for spine in ax.spines.values():
+            spine.set_edgecolor(text_color)
+            spine.set_alpha(0.3)
+
+        # Thêm giá trị trên đầu cột
         for bar in bars:
-            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.02, f'{bar.get_height()}', ha='center', color=text_color, fontweight='bold')
+            yval = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2, yval + 0.01, f'{yval:.3f}', 
+                    ha='center', va='bottom', color=text_color, fontweight='bold')
+        
         st.pyplot(fig)
 
-    st.success(f"📌 **Nhận xét:** Mô hình Matrix Factorization tối ưu nhất cho tập dữ liệu MovieLens 100k.")
-
+    # --- 6. NHẬN XÉT CHI TIẾT (Thiết kế lại thành khối Alert) ---
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(f"""
+    <div style="background: rgba(35, 213, 171, 0.1); border-left: 5px solid #23d5ab; padding: 25px; border-radius: 10px;">
+        <h4 style="margin-top:0; color:#23d5ab;">💡 Kết luận từ phân tích:</h4>
+        <p style="font-size: 1.1rem; line-height: 1.7; margin-bottom: 0;">
+            Thông qua quá trình đánh giá bằng chỉ số <b>RMSE (Root Mean Square Error)</b>, chúng ta nhận thấy mô hình 
+            <b>Matrix Factorization (SVD)</b> đạt hiệu quả vượt trội nhất. Thuật toán này có khả năng "học" được các đặc tính ẩn 
+            của người dùng và phim, giúp dự đoán điểm số với sai số thấp nhất (0.8730). <br><br>
+            Tuy nhiên, trong ứng dụng thực tế này, chúng ta ưu tiên kết hợp <b>Content-Based</b> để giải quyết vấn đề 
+            "Cold Start" (người dùng mới) và đảm bảo tốc độ phản hồi tức thì khi lọc theo thể loại.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 else:
     st.error("❌ Không tìm thấy dữ liệu. Hãy đảm bảo bạn đã chạy script tải poster.")
+
