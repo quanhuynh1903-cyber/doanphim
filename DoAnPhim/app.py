@@ -49,7 +49,8 @@ def load_data():
         ratings = pd.read_csv(r_path)
         avg = ratings.groupby('movieId')['rating'].mean().reset_index()
         movies = pd.merge(movies, avg, on='movieId', how='left')
-        movies['rating'] = movies['rating'].apply(lambda x: x if pd.notnull(x) else np.random.uniform(3.0, 4.5))
+        # Gán rating cho phim thiếu dữ liệu để đảm bảo sắp xếp đồng nhất
+        movies['rating'] = movies['rating'].apply(lambda x: x if pd.notnull(x) else np.random.uniform(2.5, 4.0))
         return movies
     return None
 
@@ -75,8 +76,14 @@ if movies is not None:
         st.write(f"📂 **Nguồn ảnh:** Local Storage")
 
     st.markdown(f"<h1>🍿 ĐỀ XUẤT PHIM {selected_vn.upper()}</h1>", unsafe_allow_html=True)
+    st.markdown(f"<p style='text-align: center; opacity: 0.8;'>Hiển thị Top {num_movies} phim có đánh giá cao nhất</p>", unsafe_allow_html=True)
+    
+    # --- LOGIC SẮP XẾP MỚI TẠI ĐÂY ---
+    # 1. Lọc theo thể loại
     genre_filter = movies[movies['genres'].str.contains(genre_map[selected_vn], case=False, na=False)]
-    display_movies = genre_filter.sample(min(len(genre_filter), num_movies))
+    
+    # 2. Sắp xếp theo rating giảm dần (ascending=False) và lấy Top theo số lượng slider
+    display_movies = genre_filter.sort_values(by='rating', ascending=False).head(num_movies)
 
     cols = st.columns(4)
     for idx, (_, row) in enumerate(display_movies.iterrows()):
@@ -93,7 +100,7 @@ if movies is not None:
                 </div>
             """, unsafe_allow_html=True)
 
-    # --- 5. So sánh & Đánh giá (SỬA LỖI MATPLOTLIB) ---
+    # --- 5. So sánh & Đánh giá ---
     st.markdown("---")
     st.markdown("<h2>📊 SO SÁNH & ĐÁNH GIÁ MÔ HÌNH</h2>", unsafe_allow_html=True)
     
@@ -105,7 +112,6 @@ if movies is not None:
     st.table(compare_df)
 
     fig, ax = plt.subplots(figsize=(10, 4))
-    # SỬA LỖI TẠI ĐÂY: Sử dụng None hoặc 'none' cho độ trong suốt thay vì chuỗi rgba không chuẩn
     fig.patch.set_facecolor('none')
     ax.set_facecolor('none')
     
@@ -121,10 +127,9 @@ if movies is not None:
         ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.02, f'{bar.get_height()}', ha='center', color=text_color, fontweight='bold')
     
     st.pyplot(fig)
+
     # --- 6. NHẬN XÉT CHI TIẾT ---
     st.markdown("### 📝 Kết luận và Nhận xét")
-    
-    # Tạo hộp nhận xét với giao diện Glassmorphism đồng bộ
     st.markdown(f"""
     <div class="custom-card" style="background: {card_bg}; border: {card_border}; padding: 20px; border-radius: 15px;">
         <p style="font-size: 1.1rem; line-height: 1.6;">
@@ -141,4 +146,3 @@ if movies is not None:
     """, unsafe_allow_html=True)
 else:
     st.error("❌ Thiếu file movies.csv hoặc ratings.csv!")
-
