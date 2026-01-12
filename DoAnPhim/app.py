@@ -121,5 +121,24 @@ if movies is not None:
         ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.02, f'{bar.get_height()}', ha='center', color=text_color, fontweight='bold')
     
     st.pyplot(fig)
+    # --- 6. NHẬN XÉT CHI TIẾT ---
+    st.markdown("### 📝 Kết luận và Nhận xét")
+    
+    # Tạo hộp nhận xét với giao diện Glassmorphism đồng bộ
+    st.markdown(f"""
+    <div class="custom-card" style="background: {card_bg}; border: {card_border}; padding: 20px; border-radius: 15px;">
+        <p style="font-size: 1.1rem; line-height: 1.6;">
+            🎯 <b>Mô hình phù hợp nhất:</b> Dựa trên biểu đồ trên, mô hình <b>Matrix Factorization (SVD)</b> là lựa chọn tối ưu nhất về mặt kỹ thuật với chỉ số <b>RMSE thấp nhất (0.873)</b>. 
+            Điều này cho thấy thuật toán phân rã ma trận có khả năng dự đoán sở thích người dùng chính xác hơn các phương pháp truyền thống.
+        </p>
+        <hr style="border: 0.5px solid rgba(255,255,255,0.1);">
+        <ul style="list-style-type: none; padding-left: 0;">
+            <li>✅ <b>SVD:</b> Phù hợp cho các hệ thống lớn cần độ chính xác cao (như Netflix thực tế).</li>
+            <li>✅ <b>Content-Based:</b> (Đang áp dụng cho giao diện trên) Phù hợp để giải quyết vấn đề "Cold Start" khi người dùng mới chưa có lịch sử đánh giá.</li>
+            <li>✅ <b>User-Based CF:</b> Mang lại tính bất ngờ (serendipity) cao trong các gợi ý phim.</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
 else:
     st.error("❌ Thiếu file movies.csv hoặc ratings.csv!")
+
