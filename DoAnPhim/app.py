@@ -24,7 +24,7 @@ else:
     sidebar_bg = "rgba(0, 0, 0, 0.4)"
     accent_color = "#58a6ff"
 
-# Inject CSS - Đã sửa lỗi Indentation
+# Inject CSS - Đã sửa lỗi Indentation để tránh Script Execution Error
 st.markdown(f"""
 <style>
 @keyframes gradient {{ 0% {{ background-position: 0% 50%; }} 50% {{ background-position: 100% 50%; }} 100% {{ background-position: 0% 50%; }} }}
@@ -66,7 +66,6 @@ def render_stars(rating):
 # --- 4. Logic Ứng dụng ---
 movies = load_data()
 if movies is not None:
-    # Banner
     st.markdown('<div class="banner"><h1>MOVIESUGGEST PRO</h1><p style="font-size: 1.2rem; opacity: 0.9;">Hệ thống gợi ý phim thông minh</p></div>', unsafe_allow_html=True)
 
     with st.sidebar:
@@ -87,21 +86,23 @@ if movies is not None:
     with m3: st.markdown(f'<div class="metric-box">🏆 Rating TB: {genre_filter["rating"].mean():.1f}</div>', unsafe_allow_html=True)
 
     st.write("")
-    st.markdown(f"<h2>🎬 TOP PHIM {selected_vn.upper()} CÓ ĐIỂM CAO NHẤT</h2>", unsafe_allow_html=True)
+    st.markdown(f"<h2>🎬 DANH SÁCH PHIM {selected_vn.upper()} THEO THỨ TỰ RATING</h2>", unsafe_allow_html=True)
     
-    # Sắp xếp và lấy dữ liệu
+    # Sắp xếp theo rating giảm dần để luôn hiện Top 3 và các phim tiếp theo đúng thứ tự
     display_movies = genre_filter.sort_values(by='rating', ascending=False).head(num_movies)
 
     cols = st.columns(4)
     for idx, (i, row) in enumerate(display_movies.iterrows()):
         with cols[idx % 4]:
             poster = get_movie_poster(row['movieId'])
+            
+            # Gán huy chương cho Top 3, các phim còn lại hiện bình thường
             badge = ""
             if idx == 0: badge = '<div class="badge">🥇</div>'
             elif idx == 1: badge = '<div class="badge">🥈</div>'
             elif idx == 2: badge = '<div class="badge">🥉</div>'
             
-            # ĐÃ SỬA LỖI HIỂN THỊ HTML: Sử dụng st.markdown với unsafe_allow_html=True
+            # SỬA LỖI: Bọc toàn bộ Card vào st.markdown với unsafe_allow_html=True
             st.markdown(f"""
                 <div style="position: relative;">
                     {badge}
@@ -116,7 +117,7 @@ if movies is not None:
                 </div>
             """, unsafe_allow_html=True)
 
-    # --- 5. Đánh giá (Đã sửa lỗi Matplotlib) ---
+    # --- 5. Đánh giá thuật toán ---
     st.markdown("<br><hr>", unsafe_allow_html=True)
     st.markdown("<h2>📊 PHÂN TÍCH HIỆU NĂNG THUẬT TOÁN</h2>", unsafe_allow_html=True)
     
@@ -131,7 +132,6 @@ if movies is not None:
     
     with c2:
         fig, ax = plt.subplots(figsize=(10, 5))
-        # SỬA LỖI: Sử dụng facecolor='none' và làm sạch trục
         fig.patch.set_facecolor('none')
         ax.set_facecolor('none')
         colors = ['#4b6cb7', '#a18cd1', '#ff4b4b']
@@ -151,4 +151,4 @@ if movies is not None:
     </div>
     """, unsafe_allow_html=True)
 else:
-    st.error("❌ Thiếu file movies.csv hoặc ratings.csv!")
+    st.error("❌ Không tìm thấy dữ liệu. Hãy đảm bảo file movies.csv và ratings.csv ở cùng thư mục!")
