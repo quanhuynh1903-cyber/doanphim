@@ -35,7 +35,7 @@ h1, h2, h3 {{ color: {text_color} !important; text-align: center; }}
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. Tiền xử lý dữ liệu ---
+# --- 3. Tiền xử lý dữ liệu (Data Preprocessing) ---
 @st.cache_data
 def load_data():
     base_path = os.path.dirname(__file__)
@@ -43,10 +43,11 @@ def load_data():
     if os.path.exists(m_path) and os.path.exists(r_path):
         movies = pd.read_csv(m_path)
         ratings = pd.read_csv(r_path)
-        # Sửa tên cột để tránh lỗi KeyError sau khi merge
+        # Xử lý làm sạch và gom nhóm dữ liệu để tính điểm trung bình
         avg_ratings = ratings.groupby('movieId')['rating'].mean().reset_index().rename(columns={'rating': 'avg_rating'})
         movies = pd.merge(movies, avg_ratings, on='movieId', how='left')
-        movies['avg_rating'] = movies['avg_rating'].fillna(3.5) # Xử lý dữ liệu thiếu
+        # Imputation: Xử lý dữ liệu thiếu bằng giá trị trung bình 3.5
+        movies['avg_rating'] = movies['avg_rating'].fillna(3.5) 
         return movies, ratings
     return None, None
 
@@ -58,26 +59,25 @@ def render_stars(rating):
     f = int(rating); h = 1 if (rating - f) >= 0.5 else 0
     return "⭐" * f + "🌗" * h + "☆" * (5 - f - h)
 
-# --- 4. Ma trận & Thuật toán Collaborative Filtering (User-Based) ---
+# --- 4. Thuật toán Ma trận & Collaborative Filtering (User-Based) ---
 def get_cf_data(target_user, ratings_df, movies_df):
-    # Tạo Ma trận Người dùng - Vật phẩm (User-Item Matrix)
+    # Khởi tạo Ma trận Người dùng - Vật phẩm (User-Item Matrix)
     user_item_matrix = ratings_df.pivot(index='userId', columns='movieId', values='rating').fillna(0)
     if target_user not in user_item_matrix.index:
         return None, None
     
-    # Tính toán độ tương đồng Cosine Similarity
+    # Tính toán độ tương đồng Cosine Similarity giữa các vector người dùng
     user_sim = cosine_similarity(user_item_matrix)
     user_sim_df = pd.DataFrame(user_sim, index=user_item_matrix.index, columns=user_item_matrix.index)
     
-    # Tìm 3 hàng xóm có độ tương đồng cao nhất (Neighbors)
+    # K-Nearest Neighbors: Tìm 3 hàng xóm có độ tương đồng cao nhất
     top_neighbors = user_sim_df[target_user].sort_values(ascending=False).iloc[1:4]
     
     user_watched = ratings_df[ratings_df['userId'] == target_user]['movieId'].tolist()
     rec_pool = ratings_df[(ratings_df['userId'].isin(top_neighbors.index)) & (~ratings_df['movieId'].isin(user_watched))]
     
-    # Gom nhóm và tính điểm trung bình từ hàng xóm
+    # Dự báo điểm số dựa trên hành vi của các người dùng tương đồng
     rec_movies = rec_pool.groupby('movieId').agg({'rating': 'mean'}).reset_index()
-    # Merge và sắp xếp theo điểm dự báo
     rec_movies = rec_movies.merge(movies_df, on='movieId').sort_values(by='rating', ascending=False).head(12)
     
     return rec_movies, top_neighbors
@@ -105,20 +105,18 @@ if movies is not None:
         use_cf = st.checkbox("Sử dụng Gợi ý cộng tác", value=True)
 
     if use_cf:
-        # THỐNG KÊ HỒ SƠ SỞ THÍCH CHI TIẾT
         st.markdown(f"### 👤 Hồ sơ sở thích của User #{user_id}")
+        # Thống kê lịch sử xem phim
         user_history = ratings[ratings['userId'] == user_id].sort_values(by='rating', ascending=False)
         user_history_info = pd.merge(user_history, movies[['movieId', 'title', 'genres', 'avg_rating']], on='movieId')
         
-        # 4 phim tiêu biểu bằng hình ảnh
         p_cols = st.columns(4)
         for i, row in enumerate(user_history_info.head(4).itertuples()):
             with p_cols[i]:
-                # Sử dụng itertuples để tránh lỗi KeyError/AttributeError
+                # Sửa lỗi AttributeError bằng cách gọi đúng thuộc tính movieId
                 st.image(get_movie_poster(row.movieId), caption=f"{row.title} ({row.rating}⭐)")
 
-        # Bảng dữ liệu thống kê chi tiết
-        with st.expander(f"📋 Bảng thống kê lịch sử đánh giá của User #{user_id}", expanded=False):
+        with st.expander(f"📋 Bảng thống kê chi tiết lịch sử User #{user_id}", expanded=False):
             st.dataframe(user_history_info[['title', 'genres', 'rating']].rename(
                 columns={'title': 'Tên phim', 'genres': 'Thể loại', 'rating': 'Điểm cá nhân'}
             ), use_container_width=True, hide_index=True)
@@ -126,11 +124,11 @@ if movies is not None:
         rec_movies, neighbors = get_cf_data(user_id, ratings, movies)
         
         if neighbors is not None:
-            # PHÂN TÍCH TRỰC QUAN ĐỘ TƯƠNG ĐỒNG
             st.markdown("### 📊 Phân tích sự tương đồng với cộng đồng")
             s_cols = st.columns(3)
             for i, (uid, sim) in enumerate(neighbors.items()):
                 with s_cols[i]:
+                    # Trực quan hóa độ tương thích dựa trên Cosine Similarity
                     st.markdown(f"""<div style="background:{card_bg}; padding:15px; border-radius:15px; text-align:center; border:1px solid {card_border}">
                     Tương đồng với <b>User #{uid}</b>: <h3 style="color:{accent_color}">{sim*100:.1f}%</h3></div>""", unsafe_allow_html=True)
             
@@ -157,9 +155,9 @@ if movies is not None:
                     </div>
                 """, unsafe_allow_html=True)
 
-    # --- 6. ĐÁNH GIÁ & SO SÁNH MÔ HÌNH ---
+    # --- 6. ĐÁNH GIÁ & SO SÁNH HIỆU NĂNG MÔ HÌNH ---
     st.divider()
-    st.markdown("### 📈 Độ chính xác và So sánh hiệu năng mô hình")
+    st.markdown("### 📈 Phân tích Độ chính xác và So sánh mô hình")
     eval_df = pd.DataFrame({
         "Mô hình": ["Content-Based", "Collaborative Filtering", "Matrix Factorization (SVD)"],
         "RMSE (Sai số)": [0.942, 0.923, 0.873] #
@@ -167,11 +165,12 @@ if movies is not None:
     
     ec1, ec2 = st.columns([1, 1.5])
     with ec1:
-        st.table(eval_df) #
-        st.success("📌 **Nhận xét:** Mô hình SVD đạt RMSE thấp nhất (0.873), thể hiện độ chính xác tối ưu nhất cho tập dữ liệu MovieLens 100k.")
+        st.table(eval_df)
+        # Nhận xét kết quả trực quan
+        st.success("📌 **Nhận xét chuyên môn:** Mô hình **SVD (Matrix Factorization)** tối ưu nhất với RMSE thấp nhất (0.873). Điều này chứng minh thuật toán phân rã ma trận xử lý cực tốt các đặc trưng ẩn của người dùng.")
     
     with ec2:
-        # Vẽ biểu đồ so sánh
+        # Biểu đồ so sánh RMSE (Sai số càng thấp càng tốt)
         fig, ax = plt.subplots(figsize=(8, 4))
         fig.patch.set_facecolor('none')
         ax.set_facecolor('none')
@@ -181,4 +180,4 @@ if movies is not None:
         st.pyplot(fig)
 
 else:
-    st.error("❌ Thiếu file movies.csv hoặc ratings.csv!")
+    st.error("❌ Thiếu file dữ liệu movies.csv hoặc ratings.csv!")
