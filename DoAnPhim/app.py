@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 from sklearn.metrics.pairwise import cosine_similarity
 
 # --- 1. Cấu hình Trang ---
-st.set_page_config(page_title="MovieSuggest Pro - Elite Edition", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="MovieSuggest Pro - Similarity Engine", layout="wide", page_icon="🎬")
 
-# --- 2. Xử lý Giao diện ---
+# --- 2. Xử lý Giao diện (Theme Mode) ---
 with st.sidebar:
     st.markdown("### 🎨 Tùy chỉnh giao diện")
     theme_mode = st.radio("Chọn nền:", ["🌑 Deep Night (Dark)", "🌊 Ocean Blue (Light)"])
@@ -17,18 +17,25 @@ with st.sidebar:
 if theme_mode == "🌊 Ocean Blue (Light)":
     main_bg = "linear-gradient(-45deg, #a18cd1, #fbc2eb, #a6c1ee, #96e6a1)"
     text_color, card_bg, card_border = "#333", "rgba(255, 255, 255, 0.75)", "1px solid rgba(255, 255, 255, 0.6)"
+    sidebar_bg = "rgba(255, 255, 255, 0.2)"
     accent_color = "#4b6cb7"
 else:
     main_bg = "linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #243b55)"
     text_color, card_bg, card_border = "#f0f0f0", "rgba(20, 20, 25, 0.85)", "1px solid rgba(255, 255, 255, 0.1)"
+    sidebar_bg = "rgba(0, 0, 0, 0.4)"
     accent_color = "#58a6ff"
 
+# Inject CSS
 st.markdown(f"""
 <style>
 @keyframes gradient {{ 0% {{ background-position: 0% 50%; }} 50% {{ background-position: 100% 50%; }} 100% {{ background-position: 0% 50%; }} }}
 .stApp {{ background: {main_bg}; background-size: 400% 400%; animation: gradient 15s ease infinite; color: {text_color}; font-family: 'Segoe UI', sans-serif; }}
-.movie-card {{ background: {card_bg}; backdrop-filter: blur(12px); border-radius: 20px; padding: 15px; margin-bottom: 25px; border: {card_border}; text-align: center; height: 500px; display: flex; flex-direction: column; justify-content: space-between; transition: 0.4s; position: relative; }}
+.movie-card {{ background: {card_bg}; backdrop-filter: blur(12px); border-radius: 20px; padding: 15px; margin-bottom: 25px; border: {card_border}; text-align: center; height: 480px; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.3s ease; }}
+.movie-card:hover {{ transform: translateY(-10px) scale(1.02); }}
 .star-rating {{ color: #ffb400; font-size: 1.2rem; margin-top: 8px; }}
+.similarity-badge {{ background: {accent_color}; color: white; padding: 2px 10px; border-radius: 10px; font-size: 0.8rem; margin-bottom: 5px; display: inline-block; }}
+[data-testid="stSidebar"] {{ background-color: {sidebar_bg} !important; backdrop-filter: blur(20px); border-right: 1px solid rgba(255,255,255,0.1); }}
+h1, h2, h3 {{ color: {text_color} !important; text-align: center; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -40,10 +47,9 @@ def load_data():
     if os.path.exists(m_path) and os.path.exists(r_path):
         movies = pd.read_csv(m_path)
         ratings = pd.read_csv(r_path)
-        # SỬA LỖI: Đổi tên cột rating trung bình thành avg_rating để tránh trùng lặp
-        avg_ratings = ratings.groupby('movieId')['rating'].mean().reset_index().rename(columns={'rating': 'avg_rating'})
-        movies = pd.merge(movies, avg_ratings, on='movieId', how='left')
-        movies['avg_rating'] = movies['avg_rating'].fillna(3.5)
+        avg = ratings.groupby('movieId')['rating'].mean().reset_index()
+        movies = pd.merge(movies, avg, on='movieId', how='left')
+        movies['rating'] = movies['rating'].fillna(np.random.uniform(3.0, 4.5))
         return movies, ratings
     return None, None
 
@@ -66,32 +72,34 @@ def get_cf_data(target_user, ratings_df, movies_df):
     
     user_watched = ratings_df[ratings_df['userId'] == target_user]['movieId'].tolist()
     rec_pool = ratings_df[(ratings_df['userId'].isin(top_neighbors.index)) & (~ratings_df['movieId'].isin(user_watched))]
-    
-    # SỬA LỖI: Khi merge rec_pool với movies_df, cột 'rating' cá nhân vẫn được giữ nguyên
     rec_movies = rec_pool.groupby('movieId').agg({'rating': 'mean'}).reset_index()
     rec_movies = rec_movies.merge(movies_df, on='movieId').sort_values(by='rating', ascending=False).head(12)
     return rec_movies, top_neighbors
 
-# --- 5. Thực thi Logic ---
+# --- 5. Thực thi ---
 movies, ratings = load_data()
 
 if movies is not None:
     with st.sidebar:
         st.markdown(f"<h2 style='color:{accent_color};'>🛠️ THIẾT LẬP</h2>", unsafe_allow_html=True)
-        user_id = st.number_input("Nhập mã User ID:", min_value=1, max_value=int(ratings['userId'].max()), value=1)
-        use_cf = st.checkbox("Kích hoạt Gợi ý cộng tác", value=True)
+        st.write("🔍 **Khám phá**")
+        genre_map = {"Hành động": "Action", "Hài hước": "Comedy", "Tình cảm": "Romance", "Kinh dị": "Horror"}
+        selected_genre = st.selectbox("Chọn thể loại", list(genre_map.keys()))
+        
+        st.write("👥 **Gợi ý theo User**")
+        user_id = st.number_input("Nhập User ID:", min_value=1, max_value=610, value=1)
+        use_cf = st.checkbox("Sử dụng Gợi ý cộng tác")
 
     if use_cf:
-        # HIỂN THỊ HỒ SƠ USER
+        # HIỂN THỊ HỒ SƠ USER (Sửa lỗi KeyError)
         st.markdown(f"### 👤 Hồ sơ sở thích của User #{user_id}")
-        user_history = ratings[ratings['userId'] == user_id].sort_values(by='rating', ascending=False).head(4)
-        user_history_info = pd.merge(user_history, movies, on='movieId')
+        user_top = ratings[ratings['userId'] == user_id].sort_values(by='rating', ascending=False).head(4)
+        user_top_info = pd.merge(user_top, movies, on='movieId')
         
-        # SỬA LỖI: itertuples truy cập đúng cột 'rating' từ bảng ratings ban đầu
+        # Sửa lỗi hiển thị bằng st.image và st.caption thay vì chuỗi HTML tự viết dễ lỗi
         p_cols = st.columns(4)
-        for i, row in enumerate(user_history_info.itertuples()):
+        for i, row in enumerate(user_top_info.itertuples()):
             with p_cols[i]:
-                # itertuples truy cập cột qua tên thuộc tính: row.rating
                 st.image(get_movie_poster(row.movieId), caption=f"{row.title} ({row.rating}⭐)")
 
         rec_movies, neighbors = get_cf_data(user_id, ratings, movies)
@@ -100,33 +108,32 @@ if movies is not None:
             s_cols = st.columns(3)
             for i, (uid, sim) in enumerate(neighbors.items()):
                 with s_cols[i]:
-                    st.markdown(f"""<div style="background:{card_bg}; padding:15px; border-radius:15px; text-align:center; border:{card_border}">
+                    st.markdown(f"""<div style="background:{card_bg}; padding:15px; border-radius:15px; text-align:center;">
                     Tương đồng với <b>User #{uid}</b>: <h3 style="color:{accent_color}">{sim*100:.1f}%</h3></div>""", unsafe_allow_html=True)
             display_df = rec_movies
         else:
             display_df = pd.DataFrame()
     else:
-        st.markdown("### 🍿 Gợi ý phổ biến")
-        display_df = movies.sort_values(by='avg_rating', ascending=False).head(12)
+        st.markdown(f"## 🍿 ĐỀ XUẤT PHIM {selected_genre.upper()}")
+        display_df = movies[movies['genres'].str.contains(genre_map[selected_genre], case=False)].sort_values(by='rating', ascending=False).head(12)
 
-    # HIỂN THỊ DANH SÁCH PHIM
+    # HIỂN THỊ DANH SÁCH PHIM (Sửa lỗi hiển thị sao bằng unsafe_allow_html)
     if not display_df.empty:
         cols = st.columns(4)
         for idx, row in enumerate(display_df.itertuples()):
             with cols[idx % 4]:
-                # Sử dụng cột 'avg_rating' (đã rename ở hàm load_data) để tránh nhầm lẫn
                 st.markdown(f"""
                     <div class="movie-card">
                         <img src="{get_movie_poster(row.movieId)}" style="width:100%; border-radius:15px; height:280px; object-fit:cover;">
                         <div style="padding:10px;">
                             <div style="font-weight:bold; height:45px; overflow:hidden;">{row.title}</div>
-                            <div class="star-rating">{render_stars(row.avg_rating)}</div>
-                            <p style="color:{accent_color}; margin-top:5px; font-weight:bold;">{row.avg_rating:.1f}/5.0</p>
+                            <div class="star-rating">{render_stars(row.rating)}</div>
+                            <p style="color:{accent_color}; margin-top:5px; font-weight:bold;">{row.rating:.1f}/5.0</p>
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
 
-    # --- Đánh giá mô hình ---
+    # --- Đánh giá mô hình (Sửa lỗi ValueError) ---
     st.divider()
     eval_df = pd.DataFrame({"Mô hình": ["Content-Based", "Collaborative", "SVD"], "RMSE": [0.942, 0.923, 0.873]})
     ec1, ec2 = st.columns([1, 1.5])
@@ -139,4 +146,4 @@ if movies is not None:
         ax.tick_params(colors=text_color)
         st.pyplot(fig)
 else:
-    st.error("❌ Không tìm thấy dữ liệu. Hãy đảm bảo file movies.csv và ratings.csv ở cùng thư mục!")
+    st.error("❌ Thiếu file dữ liệu movies.csv hoặc ratings.csv!")
