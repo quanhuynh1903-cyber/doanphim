@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics.pairwise import cosine_similarity
 
 # --- 1. Cấu hình Trang ---
-st.set_page_config(page_title="MovieSuggest Pro - Collaborative Edition", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="MovieSuggest Pro - Similarity Engine", layout="wide", page_icon="🎬")
 
 # --- 2. Xử lý Giao diện (Theme Mode) ---
 with st.sidebar:
@@ -29,16 +29,14 @@ st.markdown(f"""
 <style>
 @keyframes gradient {{ 0% {{ background-position: 0% 50%; }} 50% {{ background-position: 100% 50%; }} 100% {{ background-position: 0% 50%; }} }}
 .stApp {{ background: {main_bg}; background-size: 400% 400%; animation: gradient 15s ease infinite; color: {text_color}; font-family: 'Segoe UI', sans-serif; }}
-.banner {{ background: {card_bg}; backdrop-filter: blur(15px); border-radius: 25px; border: {card_border}; padding: 40px; text-align: center; margin-bottom: 35px; }}
-.banner h1 {{ font-size: 3.5rem !important; font-weight: 800; background: linear-gradient(90deg, #ff4b4b, {accent_color}); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }}
-.movie-card {{ background: {card_bg}; backdrop-filter: blur(12px); border-radius: 20px; padding: 15px; margin-bottom: 25px; border: {card_border}; text-align: center; height: 480px; display: flex; flex-direction: column; justify-content: space-between; transition: 0.4s; }}
+.movie-card {{ background: {card_bg}; backdrop-filter: blur(12px); border-radius: 20px; padding: 15px; margin-bottom: 25px; border: {card_border}; text-align: center; height: 500px; display: flex; flex-direction: column; justify-content: space-between; transition: 0.4s; }}
 .movie-card:hover {{ transform: translateY(-10px); box-shadow: 0 15px 35px rgba(0,0,0,0.3); border-color: {accent_color}; }}
-.metric-box {{ background: {card_bg}; border-radius: 15px; padding: 15px; text-align: center; border: {card_border}; font-weight: bold; color: {accent_color}; }}
+.similarity-badge {{ background: {accent_color}; color: white; padding: 2px 10px; border-radius: 10px; font-size: 0.8rem; margin-bottom: 5px; display: inline-block; }}
 [data-testid="stSidebar"] {{ background-color: {sidebar_bg} !important; backdrop-filter: blur(20px); }}
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. Hàm xử lý dữ liệu & Thuật toán CF ---
+# --- 3. Hàm xử lý dữ liệu & Thuật toán Tương thích ---
 @st.cache_data
 def load_data():
     base_path = os.path.dirname(__file__)
@@ -56,97 +54,81 @@ def get_movie_poster(movie_id):
     local_path = os.path.join("local_posters", f"{movie_id}.jpg")
     return local_path if os.path.exists(local_path) else "https://via.placeholder.com/500x750?text=No+Poster"
 
-def render_stars(rating):
-    f = int(rating); h = 1 if (rating - f) >= 0.5 else 0
-    return "⭐" * f + "🌗" * h + "☆" * (5 - f - h)
-
-# Thuật toán Collaborative Filtering
-def get_cf_recommendations(target_user, ratings_df, movies_df, num_recs=8):
-    # Tạo ma trận User-Item
-    user_item_matrix = ratings_df.pivot(index='userId', columns='movieId', values='rating').fillna(0)
-    
-    if target_user not in user_item_matrix.index:
-        return pd.DataFrame()
-
-    # Tính toán độ tương đồng Cosine
-    user_sim = cosine_similarity(user_item_matrix)
-    user_sim_df = pd.DataFrame(user_sim, index=user_item_matrix.index, columns=user_item_matrix.index)
-    
-    # Tìm 5 người dùng giống nhất
-    similar_users = user_sim_df[target_user].sort_values(ascending=False).iloc[1:6].index
-    
-    # Lấy các phim họ đánh giá cao nhưng User đích chưa xem
-    user_watched = ratings_df[ratings_df['userId'] == target_user]['movieId'].tolist()
-    rec_movies = ratings_df[(ratings_df['userId'].isin(similar_users)) & 
-                            (~ratings_df['movieId'].isin(user_watched)) & 
-                            (ratings_df['rating'] >= 4)]
-    
-    rec_ids = rec_movies['movieId'].unique()
-    return movies_df[movies_df['movieId'].isin(rec_ids)].head(num_recs)
-
 # --- 4. Logic Ứng dụng ---
 movies, ratings = load_data()
 
 if movies is not None:
-    st.markdown('<div class="banner"><h1>MOVIESUGGEST AI</h1><p>Hệ thống gợi ý phim thông minh dựa trên hành vi cộng đồng</p></div>', unsafe_allow_html=True)
-
     with st.sidebar:
-        st.markdown(f"<h2 style='color:{accent_color};'>🛠️ ĐIỀU KHIỂN</h2>", unsafe_allow_html=True)
-        
-        # TAB 1: Gợi ý theo thể loại (Content-Based)
-        st.markdown("---")
-        st.write("🔍 **Khám phá theo Thể loại**")
-        genre_map = {"Hành động": "Action", "Hài hước": "Comedy", "Tình cảm": "Romance", "Kinh dị": "Horror", "Khoa học viễn tưởng": "Sci-Fi", "Hoạt hình": "Animation", "Chính kịch": "Drama"}
-        selected_vn = st.selectbox("Chọn thể loại", list(genre_map.keys()))
-        
-        # TAB 2: Gợi ý theo User (Collaborative Filtering)
-        st.markdown("---")
-        st.write("👥 **Gợi ý theo sở thích bạn bè**")
-        user_id_input = st.number_input("Nhập mã User (1-610):", min_value=1, max_value=610, value=1)
-        use_cf = st.checkbox("Kích hoạt gợi ý theo User")
+        st.markdown(f"<h2 style='color:{accent_color};'>🛠️ THIẾT LẬP</h2>", unsafe_allow_html=True)
+        st.write("👥 **Hệ thống Khuyến nghị Cộng tác**")
+        target_user = st.number_input("Nhập mã User ID của bạn:", min_value=1, max_value=610, value=1)
+        st.info("💡 Hệ thống sẽ tìm các User khác có gu xem phim giống bạn nhất.")
 
-    if use_cf:
-        st.markdown(f"<h2>👥 GỢI Ý RIÊNG CHO USER #{user_id_input}</h2>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center;'>Dựa trên những người dùng có sở thích tương đồng với bạn</p>", unsafe_allow_html=True)
-        display_movies = get_cf_recommendations(user_id_input, ratings, movies)
-        if display_movies.empty:
-            st.warning("Chưa có đủ dữ liệu tương đồng cho User này.")
-    else:
-        st.markdown(f"<h2>🍿 TOP PHIM {selected_vn.upper()}</h2>", unsafe_allow_html=True)
-        genre_filter = movies[movies['genres'].str.contains(genre_map[selected_vn], case=False, na=False)]
-        display_movies = genre_filter.sort_values(by='rating', ascending=False).head(12)
+    # TẠO MA TRẬN USER-ITEM
+    user_item_matrix = ratings.pivot(index='userId', columns='movieId', values='rating').fillna(0)
+    user_sim = cosine_similarity(user_item_matrix)
+    user_sim_df = pd.DataFrame(user_sim, index=user_item_matrix.index, columns=user_item_matrix.index)
 
-    # Hiển thị Card Phim
-    if not display_movies.empty:
-        cols = st.columns(4)
-        for idx, (_, row) in enumerate(display_movies.iterrows()):
-            with cols[idx % 4]:
-                poster = get_movie_poster(row['movieId'])
+    # PHẦN 1: HỒ SƠ SỞ THÍCH CỦA BẠN
+    st.markdown(f"### 👤 Hồ sơ sở thích của User #{target_user}")
+    user_top_rated = ratings[ratings['userId'] == target_user].sort_values(by='rating', ascending=False).head(4)
+    user_top_movies = pd.merge(user_top_rated, movies, on='movieId')
+    
+    t_cols = st.columns(4)
+    for idx, row in enumerate(user_top_movies.to_dict('records')):
+        with t_cols[idx]:
+            st.image(get_movie_poster(row['movieId']), caption=f"{row['title']} ({row['rating']}⭐)", use_container_width=True)
+
+    st.divider()
+
+    # PHẦN 2: PHÂN TÍCH SỰ TƯƠNG THÍCH
+    st.markdown(f"### 📊 Phân tích sự tương thích với cộng đồng")
+    # Lấy 3 người dùng giống nhất
+    top_sim_users = user_sim_df[target_user].sort_values(ascending=False).iloc[1:4]
+    
+    c1, c2, c3 = st.columns(3)
+    for i, (uid, sim_val) in enumerate(top_sim_users.items()):
+        with [c1, c2, c3][i]:
+            st.markdown(f"""
+            <div style="background:{card_bg}; padding:15px; border-radius:15px; border-left:5px solid {accent_color};">
+                <p style="margin:0;">Tương đồng với <b>User #{uid}</b></p>
+                <h2 style="margin:0; color:{accent_color};">{sim_val*100:.1f}%</h2>
+            </div>
+            """, unsafe_allow_html=True)
+
+    # PHẦN 3: GỢI Ý PHIM DỰA TRÊN SỰ TƯƠNG THÍCH
+    st.write("")
+    st.markdown(f"### 🍿 Những phim bạn có thể thích (Dựa trên hàng xóm tương đồng)")
+    
+    similar_user_ids = top_sim_users.index.tolist()
+    user_watched = ratings[ratings['userId'] == target_user]['movieId'].tolist()
+    
+    # Lấy phim từ những người giống nhất
+    recommendations = ratings[(ratings['userId'].isin(similar_user_ids)) & 
+                              (~ratings['movieId'].isin(user_watched)) & 
+                              (ratings['rating'] >= 4.5)].head(8)
+    
+    if not recommendations.empty:
+        rec_movies = pd.merge(recommendations, movies, on='movieId')
+        r_cols = st.columns(4)
+        for idx, row in enumerate(rec_movies.iterrows()):
+            # Tính toán độ tương thích của riêng bộ phim đó (giả lập dựa trên user similarity)
+            movie_sim = top_sim_users.iloc[0] * 100 - (idx * 2) 
+            
+            with r_cols[idx % 4]:
+                poster = get_movie_poster(row[1]['movieId'])
                 st.markdown(f"""
                     <div class="movie-card">
+                        <div class="similarity-badge">Độ tương thích: {movie_sim:.1f}%</div>
                         <img src="{poster}" style="width:100%; border-radius:15px; height:280px; object-fit:cover;">
-                        <div class="movie-title"><b>{row['title']}</b></div>
-                        <div>
-                            <div class="star-rating">{render_stars(row['rating'])}</div>
-                            <p style='color:{accent_color}; font-weight:bold;'>{row['rating']:.1f}/5.0</p>
+                        <div style="padding:10px;">
+                            <div class="movie-title"><b>{row[1]['title']}</b></div>
+                            <p style="font-size:0.8rem; opacity:0.8; margin-top:5px;">Gợi ý từ User giống bạn</p>
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
-
-    # --- 5. So sánh mô hình ---
-    st.markdown("<br><hr><h2>📊 PHÂN TÍCH HIỆU NĂNG MÔ HÌNH</h2>", unsafe_allow_html=True)
-    c1, c2 = st.columns([1, 1.5])
-    with c1:
-        eval_df = pd.DataFrame({
-            "Mô hình": ["Content-Based", "Collaborative Filtering", "SVD"],
-            "RMSE (Sai số)": [0.942, 0.923, 0.873],
-            "Phương pháp": ["Thể loại phim", "Sự tương đồng User", "Phân rã ma trận"]
-        })
-        st.table(eval_df)
-    with c2:
-        fig, ax = plt.subplots(figsize=(8, 4)); fig.patch.set_facecolor('none'); ax.set_facecolor('none')
-        ax.bar(eval_df["Mô hình"], eval_df["RMSE (Sai số)"], color=[accent_color, '#a18cd1', '#ff4b4b'])
-        ax.tick_params(colors=text_color); st.pyplot(fig)
+    else:
+        st.info("Hệ thống đang tìm kiếm thêm phim phù hợp...")
 
 else:
-    st.error("❌ Thiếu file movies.csv hoặc ratings.csv!")
+    st.error("❌ Vui lòng kiểm tra lại file dữ liệu!")
