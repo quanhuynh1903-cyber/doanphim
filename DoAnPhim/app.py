@@ -140,7 +140,7 @@ if movies is not None:
         genre_map = {"Hành động": "Action", "Hài hước": "Comedy", "Chính kịch": "Drama", "Kinh dị": "Horror"}
         selected_genre = st.selectbox("Khám phá Thể loại:", list(genre_map.keys()))
         user_id = st.number_input("Nhập User ID:", min_value=1, max_value=610, value=1)
-        use_cf = st.checkbox("Sử dụng Gợi ý cộng tác", value=True)
+        use_cf = st.checkbox("Chi Tiết Used", value=True)
 
     if use_cf:
         st.markdown(f"### 👤 Hồ sơ sở thích của User #{user_id}")
@@ -241,5 +241,6 @@ if movies is not None:
         
 else:
     st.error("❌ Thiếu file dữ liệu movies.csv hoặc ratings.csv!")
+
 
 
