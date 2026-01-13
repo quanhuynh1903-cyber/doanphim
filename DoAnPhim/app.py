@@ -33,7 +33,6 @@ st.markdown(f"""
 .movie-card {{ background: {card_bg}; backdrop-filter: blur(12px); border-radius: 20px; padding: 15px; margin-bottom: 25px; border: {card_border}; text-align: center; height: 480px; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.3s ease; }}
 .movie-card:hover {{ transform: translateY(-10px) scale(1.02); }}
 .star-rating {{ color: #ffb400; font-size: 1.2rem; margin-top: 8px; }}
-.similarity-badge {{ background: {accent_color}; color: white; padding: 2px 10px; border-radius: 10px; font-size: 0.8rem; margin-bottom: 5px; display: inline-block; }}
 [data-testid="stSidebar"] {{ background-color: {sidebar_bg} !important; backdrop-filter: blur(20px); border-right: 1px solid rgba(255,255,255,0.1); }}
 h1, h2, h3 {{ color: {text_color} !important; text-align: center; }}
 </style>
@@ -82,7 +81,6 @@ movies, ratings = load_data()
 if movies is not None:
     with st.sidebar:
         st.markdown(f"<h2 style='color:{accent_color};'>🛠️ THIẾT LẬP</h2>", unsafe_allow_html=True)
-        st.write("🔍 **Khám phá**")
         genre_map = {"Hành động": "Action", "Hài hước": "Comedy", "Tình cảm": "Romance", "Kinh dị": "Horror"}
         selected_genre = st.selectbox("Chọn thể loại", list(genre_map.keys()))
         
@@ -91,17 +89,34 @@ if movies is not None:
         use_cf = st.checkbox("Sử dụng Gợi ý cộng tác")
 
     if use_cf:
-        # HIỂN THỊ HỒ SƠ USER (Sửa lỗi KeyError)
+        # --- PHẦN THAY THẾ: HỒ SƠ SỞ THÍCH CHI TIẾT ---
         st.markdown(f"### 👤 Hồ sơ sở thích của User #{user_id}")
-        user_top = ratings[ratings['userId'] == user_id].sort_values(by='rating', ascending=False).head(4)
-        user_top_info = pd.merge(user_top, movies, on='movieId')
         
-        # Sửa lỗi hiển thị bằng st.image và st.caption thay vì chuỗi HTML tự viết dễ lỗi
+        # Lấy lịch sử đánh giá của User
+        user_history = ratings[ratings['userId'] == user_id].sort_values(by='rating', ascending=False)
+        user_history_info = pd.merge(user_history, movies[['movieId', 'title', 'genres']], on='movieId')
+        
+        # 1. Hiển thị 4 phim tiêu biểu bằng hình ảnh
+        top_4_preview = user_history_info.head(4)
         p_cols = st.columns(4)
-        for i, row in enumerate(user_top_info.itertuples()):
+        for i, row in enumerate(top_4_preview.itertuples()):
             with p_cols[i]:
-                st.image(get_movie_poster(row.movieId), caption=f"{row.title} ({row.rating}⭐)")
+                st.image(get_movie_poster(row.movieId), caption=f"{row.title}")
 
+        # 2. BẢNG DỮ LIỆU RIÊNG BIỆT (Detailed Profile Table)
+        with st.expander(f"📋 Danh sách chi tiết các phim User #{user_id} đã xem", expanded=True):
+            profile_table = user_history_info[['title', 'genres', 'rating']].copy()
+            profile_table.columns = ['Tên phim', 'Thể loại', 'Điểm đánh giá']
+            
+            st.dataframe(
+                profile_table.style.format({"Điểm đánh giá": "{:.1f} ⭐"}),
+                use_container_width=True,
+                hide_index=True
+            )
+        
+        st.divider()
+
+        # Logic gợi ý CF
         rec_movies, neighbors = get_cf_data(user_id, ratings, movies)
         if neighbors is not None:
             st.markdown("### 📊 Phân tích sự tương đồng")
@@ -117,7 +132,7 @@ if movies is not None:
         st.markdown(f"## 🍿 ĐỀ XUẤT PHIM {selected_genre.upper()}")
         display_df = movies[movies['genres'].str.contains(genre_map[selected_genre], case=False)].sort_values(by='rating', ascending=False).head(12)
 
-    # HIỂN THỊ DANH SÁCH PHIM (Sửa lỗi hiển thị sao bằng unsafe_allow_html)
+    # HIỂN THỊ DANH SÁCH PHIM
     if not display_df.empty:
         cols = st.columns(4)
         for idx, row in enumerate(display_df.itertuples()):
@@ -133,7 +148,7 @@ if movies is not None:
                     </div>
                 """, unsafe_allow_html=True)
 
-    # --- Đánh giá mô hình (Sửa lỗi ValueError) ---
+    # --- Đánh giá mô hình ---
     st.divider()
     eval_df = pd.DataFrame({"Mô hình": ["Content-Based", "Collaborative", "SVD"], "RMSE": [0.942, 0.923, 0.873]})
     ec1, ec2 = st.columns([1, 1.5])
