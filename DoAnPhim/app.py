@@ -7,21 +7,90 @@ from sklearn.metrics.pairwise import cosine_similarity
 import graphviz
 
 # --- 1. Cấu hình Trang ---
-st.set_page_config(page_title="MovieSuggest Pro - Elite Edition", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="Đồ Án Phim ", layout="wide", page_icon="🎬")
 
-# --- 2. Xử lý Giao diện ---
+# --- 2. Xử lý Giao diện Nâng cao ---
 with st.sidebar:
     st.markdown("### 🎨 Tùy chỉnh giao diện")
-    theme_mode = st.radio("Chọn nền:", ["🌑 Deep Night (Dark)", "🌊 Ocean Blue (Light)"], index=0)
+    theme_mode = st.radio("Chọn nền:", [
+        "🌑 Deep Night (Dark)", 
+        "🌊 Ocean Blue (Light)", 
+        "🌅 Sunset Glow (Vibrant)", 
+        "🍃 Forest Mint (Fresh)", 
+        "🍷 Midnight Wine (Luxury)"
+    ], index=0)
     st.divider()
 
+# Thiết lập thông số màu sắc dựa trên lựa chọn
 if theme_mode == "🌊 Ocean Blue (Light)":
-    main_bg, text_color, card_bg, card_border, accent_color = "linear-gradient(-45deg, #a18cd1, #fbc2eb, #a6c1ee, #96e6a1)", "#333", "rgba(255, 255, 255, 0.75)", "1px solid rgba(255, 255, 255, 0.6)", "#4b6cb7"
-else:
-    main_bg, text_color, card_bg, card_border, accent_color = "linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #243b55)", "#f0f0f0", "rgba(20, 20, 25, 0.85)", "1px solid rgba(255, 255, 255, 0.1)", "#58a6ff"
+    main_bg = "linear-gradient(-45deg, #a18cd1, #fbc2eb, #a6c1ee, #96e6a1)"
+    text_color, card_bg, card_border, accent_color = "#333", "rgba(255, 255, 255, 0.75)", "1px solid rgba(255, 255, 255, 0.6)", "#4b6cb7"
+elif theme_mode == "🌅 Sunset Glow (Vibrant)":
+    main_bg = "linear-gradient(-45deg, #ee0979, #ff6a00, #ffb347, #ffcc33)"
+    text_color, card_bg, card_border, accent_color = "#f0f0f0", "rgba(0, 0, 0, 0.3)", "1px solid rgba(255, 255, 255, 0.2)", "#ffd700"
+elif theme_mode == "🍃 Forest Mint (Fresh)":
+    main_bg = "linear-gradient(-45deg, #11998e, #38ef7d, #a8ff78, #f0f2f0)"
+    text_color, card_bg, card_border, accent_color = "#1a3c34", "rgba(255, 255, 255, 0.6)", "1px solid rgba(255, 255, 255, 0.4)", "#00b09b"
+elif theme_mode == "🍷 Midnight Wine (Luxury)":
+    main_bg = "linear-gradient(-45deg, #23074d, #cc5333, #4b1248, #20002c)"
+    text_color, card_bg, card_border, accent_color = "#eee", "rgba(255, 255, 255, 0.15)", "1px solid rgba(255, 255, 255, 0.1)", "#ff4b2b"
+else: # Deep Night (Dark) mặc định
+    main_bg = "linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #243b55)"
+    text_color, card_bg, card_border, accent_color = "#f0f0f0", "rgba(20, 20, 25, 0.85)", "1px solid rgba(255, 255, 255, 0.1)", "#58a6ff"
 
-st.markdown(f"<style>.stApp {{ background: {main_bg}; background-size: 400% 400%; animation: gradient 15s ease infinite; color: {text_color}; }} .movie-card {{ background: {card_bg}; backdrop-filter: blur(12px); border-radius: 20px; padding: 15px; margin-bottom: 25px; border: {card_border}; text-align: center; height: 500px; display: flex; flex-direction: column; justify-content: space-between; transition: 0.4s; }} .movie-card:hover {{ transform: translateY(-10px); border-color: {accent_color}; }} .star-rating {{ color: #ffb400; font-size: 1.2rem; margin-top: 8px; }} [data-testid='stSidebar'] {{ background-color: rgba(0,0,0,0.1) !important; backdrop-filter: blur(20px); }} h1, h2, h3 {{ color: {text_color} !important; text-align: center; }}</style>", unsafe_allow_html=True)
-
+# CSS tùy chỉnh giao diện
+st.markdown(f"""
+<style>
+@keyframes gradient {{ 
+    0% {{ background-position: 0% 50%; }} 
+    50% {{ background-position: 100% 50%; }} 
+    100% {{ background-position: 0% 50%; }} 
+}}
+.stApp {{ 
+    background: {main_bg}; 
+    background-size: 400% 400%; 
+    animation: gradient 15s ease infinite; 
+    color: {text_color}; 
+    font-family: 'Segoe UI', sans-serif; 
+}}
+/* Movie Card Styles */
+.movie-card {{ 
+    background: {card_bg}; 
+    backdrop-filter: blur(15px); 
+    -webkit-backdrop-filter: blur(15px);
+    border-radius: 20px; 
+    padding: 15px; 
+    margin-bottom: 25px; 
+    border: {card_border}; 
+    text-align: center; 
+    height: 500px; 
+    display: flex; 
+    flex-direction: column; 
+    justify-content: space-between; 
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+}}
+.movie-card:hover {{ 
+    transform: translateY(-12px) scale(1.02); 
+    box-shadow: 0 15px 45px rgba(0, 0, 0, 0.3);
+    border-color: {accent_color}; 
+}}
+/* Sidebar Customization */
+[data-testid='stSidebar'] {{ 
+    background-color: rgba(0, 0, 0, 0.05) !important; 
+    backdrop-filter: blur(25px); 
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+}}
+/* Text Headers */
+h1, h2, h3 {{ 
+    color: {text_color} !important; 
+    text-align: center; 
+    font-weight: 700 !important;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+}}
+.star-rating {{ color: #ffb400; font-size: 1.2rem; margin-top: 8px; }}
+</style>
+""", unsafe_allow_html=True)
 # --- 3. Tiền xử lý dữ liệu ---
 @st.cache_data
 def load_data():
@@ -172,4 +241,5 @@ if movies is not None:
         
 else:
     st.error("❌ Thiếu file dữ liệu movies.csv hoặc ratings.csv!")
+
 
