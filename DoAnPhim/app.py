@@ -25,7 +25,6 @@ else:
     sidebar_bg = "rgba(0, 0, 0, 0.4)"
     accent_color = "#58a6ff"
 
-# Inject CSS
 st.markdown(f"""
 <style>
 @keyframes gradient {{ 0% {{ background-position: 0% 50%; }} 50% {{ background-position: 100% 50%; }} 100% {{ background-position: 0% 50%; }} }}
@@ -81,7 +80,30 @@ movies, ratings = load_data()
 if movies is not None:
     with st.sidebar:
         st.markdown(f"<h2 style='color:{accent_color};'>🛠️ THIẾT LẬP</h2>", unsafe_allow_html=True)
-        genre_map = {"Hành động": "Action", "Hài hước": "Comedy", "Tình cảm": "Romance", "Kinh dị": "Horror"}
+        st.write("🔍 **Khám phá**")
+        
+        # CẬP NHẬT DANH SÁCH THỂ LOẠI TẠI ĐÂY
+        genre_map = {
+            "Hành động": "Action",
+            "Phiêu lưu": "Adventure",
+            "Hoạt hình": "Animation",
+            "Hài hước": "Comedy",
+            "Hình sự": "Crime",
+            "Tài liệu": "Documentary",
+            "Chính kịch": "Drama",
+            "Gia đình": "Children",
+            "Giả tưởng": "Fantasy",
+            "Lịch sử": "IMAX", # MovieLens không có nhãn History riêng, thường dùng IMAX hoặc Drama
+            "Kinh dị": "Horror",
+            "Nhạc kịch": "Musical",
+            "Bí ẩn": "Mystery",
+            "Lãng mạn": "Romance",
+            "Khoa học viễn tưởng": "Sci-Fi",
+            "Giật gân": "Thriller",
+            "Chiến tranh": "War",
+            "Miền Tây": "Western"
+        }
+        
         selected_genre = st.selectbox("Chọn thể loại", list(genre_map.keys()))
         
         st.write("👥 **Gợi ý theo User**")
@@ -89,25 +111,19 @@ if movies is not None:
         use_cf = st.checkbox("Sử dụng Gợi ý cộng tác")
 
     if use_cf:
-        # --- PHẦN THAY THẾ: HỒ SƠ SỞ THÍCH CHI TIẾT ---
         st.markdown(f"### 👤 Hồ sơ sở thích của User #{user_id}")
-        
-        # Lấy lịch sử đánh giá của User
         user_history = ratings[ratings['userId'] == user_id].sort_values(by='rating', ascending=False)
         user_history_info = pd.merge(user_history, movies[['movieId', 'title', 'genres']], on='movieId')
         
-        # 1. Hiển thị 4 phim tiêu biểu bằng hình ảnh
         top_4_preview = user_history_info.head(4)
         p_cols = st.columns(4)
         for i, row in enumerate(top_4_preview.itertuples()):
             with p_cols[i]:
                 st.image(get_movie_poster(row.movieId), caption=f"{row.title}")
 
-        # 2. BẢNG DỮ LIỆU RIÊNG BIỆT (Detailed Profile Table)
         with st.expander(f"📋 Danh sách chi tiết các phim User #{user_id} đã xem", expanded=True):
             profile_table = user_history_info[['title', 'genres', 'rating']].copy()
             profile_table.columns = ['Tên phim', 'Thể loại', 'Điểm đánh giá']
-            
             st.dataframe(
                 profile_table.style.format({"Điểm đánh giá": "{:.1f} ⭐"}),
                 use_container_width=True,
@@ -116,7 +132,6 @@ if movies is not None:
         
         st.divider()
 
-        # Logic gợi ý CF
         rec_movies, neighbors = get_cf_data(user_id, ratings, movies)
         if neighbors is not None:
             st.markdown("### 📊 Phân tích sự tương đồng")
@@ -130,9 +145,8 @@ if movies is not None:
             display_df = pd.DataFrame()
     else:
         st.markdown(f"## 🍿 ĐỀ XUẤT PHIM {selected_genre.upper()}")
-        display_df = movies[movies['genres'].str.contains(genre_map[selected_genre], case=False)].sort_values(by='rating', ascending=False).head(12)
+        display_df = movies[movies['genres'].str.contains(genre_map[selected_genre], case=False, na=False)].sort_values(by='rating', ascending=False).head(12)
 
-    # HIỂN THỊ DANH SÁCH PHIM
     if not display_df.empty:
         cols = st.columns(4)
         for idx, row in enumerate(display_df.itertuples()):
@@ -148,7 +162,6 @@ if movies is not None:
                     </div>
                 """, unsafe_allow_html=True)
 
-    # --- Đánh giá mô hình ---
     st.divider()
     eval_df = pd.DataFrame({"Mô hình": ["Content-Based", "Collaborative", "SVD"], "RMSE": [0.942, 0.923, 0.873]})
     ec1, ec2 = st.columns([1, 1.5])
